@@ -1,0 +1,44 @@
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { resolve, extname } from 'node:path';
+import { WebSocketServer, WebSocket } from 'ws';
+import { Lobby, type Peer } from './lobby.js';
+const production = process.env.NODE_ENV === 'production';
+const vite = production ? null : await (await import('vite')).createServer({ server: { middlewareMode: true }, appType: 'spa' });
+const root = resolve('dist');
+const mime: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json' };
+const server = createServer(async (req, res) => {
+  if (req.url === '/health') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}'); return; }
+  if (vite) { vite.middlewares(req, res); return; }
+  try {
+    const path = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname);
+    const file = resolve(root, '.' + (path === '/' ? '/index.html' : path));
+    if (!file.startsWith(root + '/')) { res.writeHead(403); res.end(); return; }
+    const content = await readFile(file); res.writeHead(200, { 'Content-Type': mime[extname(file)] ?? 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' }); res.end(content);
+  } catch { res.writeHead(404); res.end('Not found'); }
+});
+const lobby = new Lobby();
+const wss = new WebSocketServer({ noServer: true, maxPayload: 4096 });
+server.on('upgrade', (req, socket, head) => {
+  if (req.url !== '/ws') { if (vite && req.headers['sec-websocket-protocol'] === 'vite-hmr') return; socket.destroy(); return; }
+  const expected = process.env.PUBLIC_ORIGIN;
+  if (req.headers.origin && (expected ? req.headers.origin !== expected : new URL(req.headers.origin).host !== req.headers.host)) { socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return; }
+  wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
+});
+const alive = new WeakMap<WebSocket, boolean>();
+wss.on('connection', ws => {
+  alive.set(ws, true); ws.on('pong', () => alive.set(ws, true));
+  const peer: Peer = { send: msg => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }, close: () => ws.close() };
+  let windowStart = Date.now(), count = 0;
+  ws.on('message', data => {
+    if (Date.now() - windowStart > 10_000) { windowStart = Date.now(); count = 0; }
+    if (++count > 40) { lobby.error(peer, 'RATE_LIMIT', 'Too many requests. Please wait a moment.'); return; }
+    try { lobby.handle(peer, JSON.parse(data.toString())); } catch { lobby.error(peer, 'BAD_REQUEST', 'Could not read that request.'); }
+  });
+  ws.on('close', () => lobby.disconnect(peer)); ws.on('error', () => ws.terminate());
+});
+const gameTimer = setInterval(() => lobby.tick(), 1000);
+const timer = setInterval(() => { lobby.sweep(); for (const ws of wss.clients) { if (!alive.get(ws)) ws.terminate(); else { alive.set(ws, false); ws.ping(); } } }, 5000);
+const port = Number(process.env.PORT ?? 3000); server.listen(port, process.env.HOST ?? '0.0.0.0', () => console.log(`MAYDAY ready on http://localhost:${port}`));
+function shutdown() { clearInterval(timer); clearInterval(gameTimer); for (const ws of wss.clients) ws.terminate(); wss.close(); server.close(); void vite?.close(); }
+process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown);

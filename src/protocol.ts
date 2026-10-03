@@ -1,0 +1,10 @@
+export type Player = { id: string; nickname: string; connected: boolean; selectedAircraft?: string };
+export type AircraftStatus = 'approach' | 'holding' | 'landing' | 'taxi-in' | 'gate' | 'taxi-out' | 'queued' | 'takeoff';
+export type Aircraft = { id: string; callsign: string; kind: 'arrival' | 'departure'; status: AircraftStatus; runway?: 0 | 1; remaining: number; fuel: number; revision: number; controller?: string; emergency?: boolean };
+export type GameState = { aircraft: Aircraft[]; score: number; handled: number; missed: number; unsafe: number; secondsLeft: number; elapsed: number; sequence: number; nextSpawn: number; trafficInterval: number; weather?: { runway: 0 | 1; endsAt: number }; nextWeather: number; nextEmergency: number; emergenciesHandled: number };
+export type RoomState = { code: string; hostId: string; phase: 'lobby' | 'started' | 'finished'; game?: GameState; players: Player[]; events: { id: number; text: string }[]; revision: number };
+export const quickMessages = ['Runway clear', 'Need help', 'Prioritize emergency', 'I have this flight'] as const;
+export type QuickMessage = typeof quickMessages[number];
+export type Command = 'hold' | 'land' | 'taxi' | 'takeoff';
+export type ClientMessage = { type: 'create'; nickname: string } | { type: 'join'; nickname: string; code: string } | { type: 'resume'; token: string } | { type: 'start' | 'leave' | 'restart' } | { type: 'select'; aircraftId: string | null } | { type: 'quick'; message: QuickMessage } | { type: 'command'; aircraftId: string; command: Command; runway?: 0 | 1; revision: number };
+export type ServerMessage = { type: 'session'; token: string; playerId: string } | { type: 'state'; room: RoomState } | { type: 'left' } | { type: 'error'; code: string; message: string };

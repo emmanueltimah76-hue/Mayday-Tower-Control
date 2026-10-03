@@ -1,0 +1,1 @@
+{"extends":"./tsconfig.json","compilerOptions":{"noEmit":false,"outDir":"build","rootDir":".","module":"NodeNext","moduleResolution":"NodeNext","declaration":false},"include":["server/**/*.ts","src/protocol.ts"],"exclude":["tests","src/main.tsx","src/Airport.tsx"]}
