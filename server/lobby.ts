@@ -1,3 +1,4 @@
+import {Analytics} from './analytics.js';
 import {Rankings} from './rankings.js';
 import {airports,type Difficulty} from '../src/airports.js';
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
@@ -19,6 +20,7 @@ export class Lobby {
   private practiceRounds = 0;
   private measure(now = Date.now()) {
     const delta = Math.max(0, now - this.measuredAt);
+    this.analytics.time(this.measuredAt, now, this.peers.size, [...this.peers.values()].filter(s => s.room.phase === 'started').length);
     this.playerMs += this.peers.size * delta;
     this.playMs += [...this.peers.values()].filter(s => s.room.phase === 'started').length * delta;
     this.measuredAt = Math.max(this.measuredAt, now);
@@ -31,7 +33,7 @@ export class Lobby {
   rooms = new Map<string, Room>();
   sessions = new Map<string, { room: Room; member: Member }>();
   peers = new Map<Peer, { room: Room; member: Member }>();
-  constructor(private graceMs = 30_000, private idleMs = 30 * 60_000, public rankings = new Rankings()) {}
+  constructor(private graceMs = 30_000, private idleMs = 30 * 60_000, public rankings = new Rankings(), public analytics = new Analytics()) {}
   error(peer: Peer, code: string, message: string) { peer.send({ type: 'error', code, message }); }
   event(room: Room, text: string) { room.events.push({ id: ++room.revision, text }); room.events = room.events.slice(-20); }
   state(room: Room): RoomState { return { code: room.code, hostId: room.hostId, phase: room.phase, practice: room.practice, difficulty:room.difficulty??'easy', game: room.game, revision: room.revision, players: room.members.map(m => ({ id: m.id, nickname: m.nickname, connected: !!m.peer, selectedAircraft: m.selectedAircraft })), events: room.events }; }
@@ -65,7 +67,7 @@ export class Lobby {
         if (room.members.some(m => m.nickname.toLowerCase() === nickname.toLowerCase())) return this.error(peer, 'DUPLICATE', 'That nickname is taken in this room. Choose another.');
       }
       const member: Member = { id: randomUUID(), nickname, token: randomBytes(32).toString('hex') };
-      this.joins++; room.members.push(member); if (!room.hostId) room.hostId = member.id;
+      this.analytics.event('roomJoins'); this.joins++; room.members.push(member); if (!room.hostId) room.hostId = member.id;
       this.sessions.set(member.token, { room, member }); this.attach(peer, room, member);
       this.event(room, `${nickname} joined the crew.`); this.broadcast(room); return;
     }
@@ -91,7 +93,7 @@ export class Lobby {
       if (room.phase !== 'lobby') return this.error(peer, 'STARTED', 'The session has already started.');
       if (msg.type === 'practice' && room.members.length !== 1) return this.error(peer, 'PRACTICE_ONLY', 'Solo practice is for one player. Start a crew session instead.');
       if (msg.type === 'start' && room.members.filter(m => m.peer).length < 2) return this.error(peer, 'NEED_PLAYERS', 'At least two connected players are needed.');
-      room.roundCrew=room.members.filter(m=>m.peer).map(m=>m.nickname);this.rounds++; if (msg.type === 'practice') this.practiceRounds++; room.practice = msg.type === 'practice'; room.game = createGame(room.members.filter(m => m.peer).length,room.difficulty??'easy'); room.lastTick = Date.now(); room.phase = 'started'; this.event(room, room.practice ? 'Solo practice started. You control every flight.' : 'The host started the session.'); this.broadcast(room); return;
+      room.roundCrew=room.members.filter(m=>m.peer).map(m=>m.nickname);this.analytics.event('shiftsStarted'); if(msg.type === 'practice') this.analytics.event('soloShifts'); this.rounds++; if (msg.type === 'practice') this.practiceRounds++; room.practice = msg.type === 'practice'; room.game = createGame(room.members.filter(m => m.peer).length,room.difficulty??'easy'); room.lastTick = Date.now(); room.phase = 'started'; this.event(room, room.practice ? 'Solo practice started. You control every flight.' : 'The host started the session.'); this.broadcast(room); return;
     }
     if (msg.type === 'select') {
       const { room, member } = session;
@@ -131,7 +133,7 @@ export class Lobby {
       room.lastTick += seconds * 1000;
       tickGame(room.game, seconds, text => this.event(room, text));
       for (const m of room.members) if (!room.game.aircraft.some(a => a.id === m.selectedAircraft)) m.selectedAircraft = undefined;
-      if (room.game.secondsLeft === 0) { this.completed++; this.rankings.record(room.game,room.roundCrew??room.members.map(m=>m.nickname),!!room.practice);room.phase = 'finished'; this.event(room, 'Shift complete. Your crew can play again.'); }
+      if (room.game.secondsLeft === 0) { this.analytics.event('shiftsCompleted',now); this.completed++; this.rankings.record(room.game,room.roundCrew??room.members.map(m=>m.nickname),!!room.practice);room.phase = 'finished'; this.event(room, 'Shift complete. Your crew can play again.'); }
       this.broadcast(room);
     }
   }
