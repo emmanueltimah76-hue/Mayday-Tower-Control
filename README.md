@@ -30,3 +30,7 @@ Open How to play in the lobby or during a round. Aircraft selection opens a fixe
 ## Remaining work
 
 Separate physical-device playtesting, public hosting and contest submission assets. Confirm the separate Handshake mission instructions before submission.
+
+## Solo practice
+
+Create a room and choose **Start solo practice** to learn the controls without another player. Practice uses the same seven-minute shift and scoring. Return to the lobby after the shift to invite friends. Multiplayer requires 2–6 connected players.
