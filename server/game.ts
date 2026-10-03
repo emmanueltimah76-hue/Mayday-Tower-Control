@@ -89,6 +89,8 @@ export function tickGame(game:GameState,seconds:number,emit:(s:string)=>void){
     else if(['gate','queued'].includes(p.status)||(p.status==='landing'&&!p.onFinal&&p.remaining===0)){p.groundSpeed=Math.max(0,(p.groundSpeed??0)-flightProfiles[p.aircraftType??'narrowbody'].brake*.1);}
     p.motionSamples.push({position:[...p.position!],heading:p.heading??0});
    }
+   if(Math.hypot(p.motionSamples.at(-1)!.position[0]-p.position![0],p.motionSamples.at(-1)!.position[1]-p.position![1])>1e-9)p.motionSamples.push({position:[...p.position!],heading:p.heading??0});
+   while(p.motionSamples.length<11)p.motionSamples.push({position:[...p.position!],heading:p.heading??0});
    if(p.status==='taxi-out'&&p.standId){const stand=stands[game.difficulty].find(s=>s.id===p.standId)!;const clearance=(p.aircraftType==='heavy'?220:p.aircraftType==='narrowbody'?150:80)/FEET_PER_NM;if(Math.hypot(p.position![0]-stand.position[0],p.position![1]-stand.position[1])*config.nmPerUnit>clearance)p.standId=undefined;}
    if(arrived&&p.status!=='holding'&&p.status!=='approach'){p.revision++;
 
