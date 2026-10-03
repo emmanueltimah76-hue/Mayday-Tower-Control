@@ -1,3 +1,4 @@
+import {normalizeMapPoint} from './mapConstants.js';
 import type {Difficulty,Point} from './airports.js';
 export type Stand={id:string;terminal:string;position:Point};
 // Airport terminal groupings are based on public airport maps. Stand IDs and exact geometry are game constructs.
@@ -9,3 +10,5 @@ export const stands:Record<Difficulty,Stand[]>={
 };
 export const serviceSteps=['Deplane','Refuel','Service','Board'] as const;
 export function serviceSeconds(type:string|undefined){return type==='heavy'?18:type==='light'?7:12;}
+
+for(const difficulty of Object.keys(stands) as Difficulty[]) for(const stand of stands[difficulty]) stand.position=normalizeMapPoint(stand.position,difficulty);

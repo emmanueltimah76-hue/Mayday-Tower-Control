@@ -1,5 +1,5 @@
 import {airports,runwayEnds,type Difficulty,type Point} from './airports.js';
-export const airspace={left:-130,right:830,top:-100,bottom:560};
+export const airspace={left:-130,right:830,top:-220,bottom:620};
 // Names verified against FAA PRC/ORD pages, PHX standardized taxi routes, and LAWA E16/E18 advisory.
 // Coordinates, connectors, stands and inbound/outbound fixes are schematic game geometry.
 export const groundNames:Record<Difficulty,string[]>={easy:['A','B','D'],medium:['E','F','C'],hard:['E','E'],expert:['A']};

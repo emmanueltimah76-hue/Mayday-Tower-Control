@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import type {RoomState} from './protocol';
 export function useTowerSound(room:RoomState) {
  const [enabled,setEnabled]=useState(false);
+ const lastAlertTone=useRef(-Infinity);
  const context=useRef<AudioContext|null>(null);
  const previous=useRef<{id:number;phase:string}>({id:room.events.at(-1)?.id??0,phase:room.phase});
  function tone(frequency:number) {
@@ -17,7 +18,7 @@ export function useTowerSound(room:RoomState) {
  }
  useEffect(()=>{
   const events=room.events.filter(e=>e.id>previous.current.id);
-  if(enabled){if(room.phase==='finished'&&previous.current.phase!=='finished')tone(880);else if(events.some(e=>e.text.startsWith('ALERT:')))tone(1100);else if(events.some(e=>e.text.startsWith('MAYDAY!')))tone(980);else if(events.some(e=>e.text.startsWith('Crosswinds!')))tone(420);else if(events.some(e=>e.text.includes('says:')))tone(660);}
+  if(enabled){if(room.phase==='finished'&&previous.current.phase!=='finished')tone(880);else if(events.some(e=>e.text.startsWith('ALERT:')||e.text.startsWith('MAYDAY!'))&&performance.now()-lastAlertTone.current>=5000){lastAlertTone.current=performance.now();tone(events.some(e=>e.text.startsWith('MAYDAY!'))?980:1100);}else if(events.some(e=>e.text.startsWith('Crosswinds!')))tone(420);else if(events.some(e=>e.text.includes('says:')))tone(660);}
   previous.current={id:room.events.at(-1)?.id??previous.current.id,phase:room.phase};
  },[room.revision,enabled]);
  useEffect(()=>()=>{void context.current?.close();},[]);

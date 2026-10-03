@@ -111,9 +111,11 @@ export class Lobby {
       const { room, member } = session;
       if (room.phase !== 'started' || !room.game) return this.error(peer, 'NO_GAME', 'There is no active round.');
       const result = command(room.game, msg.aircraftId, msg.command, msg.runway, msg.revision, member.nickname);
+      const aircraft=room.game.aircraft.find(p=>p.id===msg.aircraftId);
+      if(aircraft){aircraft.commandLog=[...(aircraft.commandLog??[]),{action:msg.command,accepted:!result.error,message:result.error??result.event??'Command accepted.',at:Date.now(),controller:member.nickname}].slice(-5);}
       if (result.error) this.error(peer, 'COMMAND', result.error);
       if (result.event) this.event(room, result.event);
-      if (result.changed) this.broadcast(room);
+      this.broadcast(room);
       return;
     }
     if (msg.type === 'restart') {
