@@ -16,7 +16,7 @@ export function curvedRoute(points:Point[],radius:number):{points:Point[];turns:
  for(let i=1;i<points.length-1;i++){
   const a=points[i-1],b=points[i],c=points[i+1],ab=distance(a,b),bc=distance(b,c);if(ab<.01||bc<.01)continue;
   const u:Point=[(b[0]-a[0])/ab,(b[1]-a[1])/ab],v:Point=[(c[0]-b[0])/bc,(c[1]-b[1])/bc],angle=Math.acos(Math.max(-1,Math.min(1,u[0]*v[0]+u[1]*v[1])));
-  if(angle<.05||angle>Math.PI-.05){output.push(b);continue;}
+  if(angle<.05||angle>Math.PI-.05){if(angle>.001&&angle<.05)turns.push(output.length);output.push(b);continue;}
   const tangent=radius*Math.tan(angle/2);
   // A corner too short for the type radius is left for explicit route validation, rather than pivoting.
   if(tangent>Math.min(ab,bc)*.45){output.push(b);continue;}
@@ -26,7 +26,7 @@ export function curvedRoute(points:Point[],radius:number):{points:Point[];turns:
 }
 export function setRoute(p:Aircraft,points:Point[],scale=NM_PER_MAP_UNIT){
  // Every new route begins at the current position, including wind changes and holds.
- const from=p.position??points[0];p.route=[from,...points.slice(1)].filter((point,i,list)=>i===0||distance(point,list[i-1])>.001);if(p.status.startsWith('taxi')||p.status==='takeoff'){
+ const from=p.position??points[0];p.route=[from,...points.slice(1)].filter((point,i,list)=>i===0||distance(point,list[i-1])>.001);if(p.status.startsWith('taxi')||p.status==='takeoff'||p.status==='pushback'){
  const roll=p.takeoffRollIndex??1,prefix=p.status==='takeoff'?p.route.slice(0,roll+1):p.route;
  const smooth=curvedRoute(prefix,minimumTurnFeet[p.aircraftType??'narrowbody']/FEET_PER_NM/scale);
  p.route=p.status==='takeoff'?[...smooth.points,...p.route.slice(roll+1)]:smooth.points;p.routeTurns=smooth.turns;
@@ -38,25 +38,28 @@ export function remainingDistance(p:Aircraft){if(!p.route||!p.position)return 0;
 export function advanceMotion(p:Aircraft,dt:number,scale=NM_PER_MAP_UNIT):boolean{
  const profile=flightProfiles[p.aircraftType??'narrowbody'];const oldSpeed=p.groundSpeed??0;const before=p.position;if(!before||!p.route||p.route.length<2)return true;
  let index=p.routeIndex??1;while(index<p.route.length&&distance(before,p.route[index])<.001)index++;p.routeIndex=index;
- const left=remainingDistance(p);const ground=(p.status==='takeoff'&&(index<(p.takeoffRollIndex??1)||((p.altitude??0)<1&&oldSpeed<profile.approach*.85)))||p.status.startsWith('taxi')||p.status==='queued'||p.status==='gate'||(p.status==='landing'&&!p.onFinal);
+ const left=remainingDistance(p);const ground=(p.status==='takeoff'&&(index<(p.takeoffRollIndex??1)||((p.altitude??0)<1&&oldSpeed<profile.approach*.85)))||p.status.startsWith('taxi')||p.status==='queued'||p.status==='gate'||p.status==='pushback'||(p.status==='landing'&&!p.onFinal);
  let target=p.status==='takeoff'&&index<(p.takeoffRollIndex??1)?profile.taxi:p.status.startsWith('taxi')?profile.taxi:p.status==='landing'&&!p.onFinal?0:p.status==='takeoff'?profile.approach+25:profile.approach;
  if(!ground&&p.targetSpeed!==undefined)target=p.targetSpeed;
+ if(p.status==='pushback')target=3;
+ if(ground&&p.groundSpeedLimit!==undefined)target=Math.min(target,p.groundSpeedLimit);
  let rate=ground?3:2;
  if(p.status==='landing'&&!p.onFinal)rate=profile.brake;
  if(p.status==='takeoff')rate=index<(p.takeoffRollIndex??1)?3:profile.acceleration;
  const stopping=oldSpeed*oldSpeed/(2*4*SECONDS_PER_HOUR*scale);
  if(p.status.startsWith('taxi')||(p.status==='takeoff'&&index<(p.takeoffRollIndex??1))){
-  if(p.routeTurns?.includes(index)||(p.routeTurns?.some(k=>k>index&&k<=index+3)&&distance(before,p.route[index])<=stopping+6)){target=profile.turnTaxi;rate=4;}
+  if(p.routeTurns?.includes(index)&&distance(p.route[index-1]??before,p.route[index])<=minimumTurnFeet[p.aircraftType??'narrowbody']/FEET_PER_NM/scale*.25||(p.routeTurns?.some(k=>k>=index&&k<=index+3)&&distance(before,p.route[index])<=stopping+6)){target=profile.turnTaxi;rate=4;}
   if(left<=stopping+.005){target=0;rate=4;}
   else if(index<p.route.length-1){const a=p.route[index],b=p.route[index+1];const desired=Math.atan2(b[0]-a[0],-(b[1]-a[1]))*180/Math.PI;if(distance(before,a)<=stopping+6&&Math.abs(shortestAngle(p.heading??desired,desired))>20){target=profile.turnTaxi;rate=4;}}
  }
+ if(ground&&p.groundSpeedLimit!==undefined){target=Math.min(target,p.groundSpeedLimit);rate=4;}
  p.groundSpeed=Math.max(0,oldSpeed+Math.max(-rate*dt,Math.min(rate*dt,target-oldSpeed)));
  const travel=(oldSpeed+p.groundSpeed)/2*dt/(SECONDS_PER_HOUR*scale);
  let pos:Point=[...before];
  if(ground){
   let leftTravel=travel;
   while(leftTravel>0&&index<p.route.length){const next=p.route[index],d=distance(pos,next);if(d<.001){index++;continue;}const h=Math.atan2(next[0]-pos[0],-(next[1]-pos[1]))*180/Math.PI;
-   p.heading=(p.heading??h)+shortestAngle(p.heading??h,h);const moved=Math.min(leftTravel,d);pos=[pos[0]+Math.sin(h*Math.PI/180)*moved,pos[1]-Math.cos(h*Math.PI/180)*moved];leftTravel-=moved;if(moved>=d)index++;}
+   const nose=p.status==='pushback'?h+180:h;p.heading=(p.heading??nose)+shortestAngle(p.heading??nose,nose);const moved=Math.min(leftTravel,d);pos=[pos[0]+Math.sin(h*Math.PI/180)*moved,pos[1]-Math.cos(h*Math.PI/180)*moved];leftTravel-=moved;if(moved>=d)index++;}
  }else{
   let next=p.route[index];
   if(next){
@@ -95,6 +98,6 @@ export function advanceMotion(p:Aircraft,dt:number,scale=NM_PER_MAP_UNIT):boolea
  const arrived=index>=p.route.length;
  p.remaining=arrived?0:Math.max(1,Math.ceil(remaining*scale*SECONDS_PER_HOUR/Math.max(p.groundSpeed,ground?profile.taxi:profile.approach)));
  // Taxi braking can stop just short of a waypoint; crawl to it continuously, without snapping.
- if(!arrived&&p.groundSpeed<.05&&ground&&p.status.startsWith('taxi'))p.groundSpeed=Math.min(profile.turnTaxi,.01);
+ if(!arrived&&p.groundSpeed<.05&&ground&&p.status.startsWith('taxi')&&p.groundSpeedLimit!==0)p.groundSpeed=Math.min(profile.turnTaxi,.01);
  return arrived;
 }
