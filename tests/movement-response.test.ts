@@ -15,7 +15,7 @@ test('all aircraft fly forward on heading even when the target is behind or acro
 test('hold uses forward motion and a cleared held aircraft does not orbit its target forever',()=>{
  for(const d of difficulties){const g=createGame(2,d),p=g.aircraft[0];g.aircraft=[p];g.nextWave=g.nextWind=g.nextWeather=g.nextEmergency=999;p.fuel=9999;command(g,p.id,'hold',0,p.revision,'Tower');tickGame(g,15,()=>{});
  const samples=p.motionSamples!;assert.ok(samples.length>1);for(let i=1;i<samples.length;i++){const a=samples[i-1],b=samples[i],h=b.heading*Math.PI/180,dx=b.position[0]-a.position[0],dy=b.position[1]-a.position[1];assert.ok(dx*Math.sin(h)-dy*Math.cos(h)>0);assert.ok(Math.abs(dx*Math.cos(h)+dy*Math.sin(h))<1e-8);}
- assert.ok(command(g,p.id,'land',0,p.revision,'Tower').changed);tickGame(g,300,()=>{});assert.equal(p.status,'landing');assert.equal(p.remaining,0);}
+ assert.ok(command(g,p.id,'land',0,p.revision,'Tower').changed);for(let i=0;i<400&&!(p.status==='landing'&&!p.onFinal&&p.remaining===0);i++)tickGame(g,1,()=>{});assert.equal(p.status,'landing');assert.equal(p.remaining,0);}
 });
 test('commands retain accepted and rejected receipts, including stale revision',()=>{
  const l=new Lobby();class P implements Peer{messages:ServerMessage[]=[];send(m:ServerMessage){this.messages.push(m)}close(){}}

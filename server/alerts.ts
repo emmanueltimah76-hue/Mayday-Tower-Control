@@ -1,3 +1,4 @@
+import {points} from '../src/balance.js';
 import {ALERT_REPEAT_SECONDS,SECONDS_PER_HOUR} from '../src/mapConstants.js';
 import type {Aircraft,GameState,TrafficAlert} from '../src/protocol.js';
 import {airports,runwayName} from '../src/airports.js';
@@ -17,7 +18,7 @@ export function updateAlerts(game:GameState,emit:(text:string)=>void){if(!game.d
  for(let r=0;r<c.runways.length;r++){const runway=c.runways[r],width=.018/c.nmPerUnit;const on=(p:Aircraft)=>!airborne(p)&&(p.altitude??0)<=10&&segmentDistance(p.position!,runway.start,runway.end)<width;const entering=(p:Aircraft)=>{if(airborne(p)||!p.route||!p.groundSpeed)return false;const v=velocity(p,c.nmPerUnit);return segmentDistance([p.position![0]+v[0]*5,p.position![1]+v[1]*5],runway.start,runway.end)<width;};const ao=on(a),bo=on(b);if(ao&&bo||ao&&entering(b)||bo&&entering(a)){alerts.push({id:`runway:${r}:${pair}`,kind:'incursion',aircraftIds:ids,severity:ao&&bo?'loss':'warning',message:`Runway ${runwayName(game,r)}: ${a.callsign} / ${b.callsign}, ${ao&&bo?'incursion':'occupied runway entry predicted'}.`});}
  }
  }
- const old=new Map((game.alerts??[]).map(a=>[a.id,a]));for(const alert of alerts){const previous=old.get(alert.id);if(!previous||previous.severity!==alert.severity){if(alert.severity==='loss'){const penalty=alert.kind==='incursion'?75:100;game.score-=penalty;game.unsafe++;if(alert.kind==='incursion')game.incursions=(game.incursions??0)+1;else game.separationLosses=(game.separationLosses??0)+1;emit(`ALERT: ${alert.message} (−${penalty}).`);}else if(game.elapsed-(game.alertLastLogged?.[alert.id]??-Infinity)>=ALERT_REPEAT_SECONDS){emit(`ALERT: ${alert.message} Take action to prevent a loss.`);(game.alertLastLogged??={})[alert.id]=game.elapsed;}}}
+ const old=new Map((game.alerts??[]).map(a=>[a.id,a]));for(const alert of alerts){const previous=old.get(alert.id);if(!previous||previous.severity!==alert.severity){if(alert.severity==='loss'){const penalty=alert.kind==='incursion'?points.incursion:points.separation;game.score-=penalty;game.unsafe++;if(alert.kind==='incursion')game.incursions=(game.incursions??0)+1;else game.separationLosses=(game.separationLosses??0)+1;emit(`ALERT: ${alert.message} (−${penalty}).`);}else if(game.elapsed-(game.alertLastLogged?.[alert.id]??-Infinity)>=ALERT_REPEAT_SECONDS){emit(`ALERT: ${alert.message} Take action to prevent a loss.`);(game.alertLastLogged??={})[alert.id]=game.elapsed;}}}
  game.alertLastLogged=Object.fromEntries(Object.entries(game.alertLastLogged??{}).filter(([,at])=>game.elapsed-at<ALERT_REPEAT_SECONDS));
  game.alerts=alerts;
 }

@@ -11,4 +11,4 @@ export const ALERT_REPEAT_SECONDS = 20;
 const sourceScale={easy:.0044998,medium:.0038833,hard:.0055768,expert:.009906};
 export function normalizeMapPoint(point:[number,number],difficulty:keyof typeof sourceScale):[number,number]{const f=sourceScale[difficulty]/NM_PER_MAP_UNIT;return [350+(point[0]-350)*f,210+(point[1]-210)*f];}
 
-export const MAP_VIEW={x:-180,y:-240,w:1200,h:900};
+export const MAP_VIEW={x:-570,y:-620,w:1940,h:1640};
