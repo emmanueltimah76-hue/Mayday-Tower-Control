@@ -1,13 +1,13 @@
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'expert';
 export type Point = [number,number];
 export type Runway = {ends:[string,string];heading:number;start:Point;end:Point};
-export type AirportConfig = {code:string;name:string;runways:Runway[];interval:number;emergencyEvery:number;weatherEvery:number;fuelFactor:number;wave:number};
+export type AirportConfig = {code:string;name:string;runways:Runway[];interval:number;emergencyEvery:number;weatherEvery:number;fuelFactor:number;wave:number;nmPerUnit:number};
 const layouts = {"KPRC": [{"ends": ["3L", "21R"], "heading": 41.3, "start": [344.6, 188.3], "end": [454.2, 55.0]}, {"ends": ["3R", "21L"], "heading": 41.3, "start": [245.8, 331.0], "end": [432.3, 124.3]}, {"ends": ["12", "30"], "heading": 136.5, "start": [256.8, 239.0], "end": [366.5, 355.0]}], "KPHX": [{"ends": ["7L", "25R"], "heading": 90.0, "start": [143.7, 262.9], "end": [582.1, 264.5]}, {"ends": ["7R", "25L"], "heading": 90.0, "start": [143.7, 296.9], "end": [466.0, 298.5]}, {"ends": ["8", "26"], "heading": 90.1, "start": [105.0, 111.5], "end": [595.0, 113.1]}], "KLAX": [{"ends": ["6L", "24R"], "heading": 83.0, "start": [136.3, 137.9], "end": [397.2, 105.7]}, {"ends": ["6R", "24L"], "heading": 83.0, "start": [105.0, 162.7], "end": [423.0, 123.4]}, {"ends": ["7L", "25R"], "heading": 83.0, "start": [217.5, 283.9], "end": [595.0, 237.3]}, {"ends": ["7R", "25L"], "heading": 83.0, "start": [244.4, 304.3], "end": [569.1, 264.3]}], "KORD": [{"ends": ["4L", "22R"], "heading": 39.0, "start": [313.0, 183.0], "end": [391.8, 87.3]}, {"ends": ["4R", "22L"], "heading": 42.0, "start": [378.3, 355.0], "end": [466.6, 254.5]}, {"ends": ["9C", "27C"], "heading": 90.0, "start": [233.4, 142.9], "end": [419.7, 142.9]}, {"ends": ["9L", "27R"], "heading": 90.0, "start": [255.5, 55.0], "end": [379.7, 55.0]}, {"ends": ["9R", "27L"], "heading": 90.0, "start": [293.0, 169.7], "end": [424.9, 169.7]}, {"ends": ["10C", "28C"], "heading": 90.0, "start": [233.8, 279.9], "end": [412.6, 279.9]}, {"ends": ["10L", "28R"], "heading": 90.0, "start": [233.8, 259.9], "end": [449.0, 259.3]}, {"ends": ["10R", "28L"], "heading": 90.0, "start": [250.0, 331.4], "end": [374.3, 331.1]}]} as Record<string,Runway[]>;
 export const airports: Record<Difficulty,AirportConfig> = {
- easy:{code:'KPRC',name:'Prescott Regional',runways:layouts.KPRC,interval:26,emergencyEvery:125,weatherEvery:135,fuelFactor:1.4,wave:2},
- medium:{code:'KPHX',name:'Phoenix Sky Harbor',runways:layouts.KPHX,interval:19,emergencyEvery:100,weatherEvery:110,fuelFactor:1.15,wave:3},
- hard:{code:'KLAX',name:'Los Angeles International',runways:layouts.KLAX,interval:14,emergencyEvery:80,weatherEvery:90,fuelFactor:1,wave:4},
- expert:{code:'KORD',name:"Chicago O'Hare",runways:layouts.KORD,interval:10,emergencyEvery:65,weatherEvery:75,fuelFactor:.85,wave:5}
+ easy:{code:'KPRC',nmPerUnit:0.0044998,name:'Prescott Regional',runways:layouts.KPRC,interval:26,emergencyEvery:125,weatherEvery:135,fuelFactor:1.4,wave:2},
+ medium:{code:'KPHX',nmPerUnit:0.0038833,name:'Phoenix Sky Harbor',runways:layouts.KPHX,interval:19,emergencyEvery:100,weatherEvery:110,fuelFactor:1.15,wave:3},
+ hard:{code:'KLAX',nmPerUnit:0.0055768,name:'Los Angeles International',runways:layouts.KLAX,interval:14,emergencyEvery:80,weatherEvery:90,fuelFactor:1,wave:4},
+ expert:{code:'KORD',nmPerUnit:0.009906,name:"Chicago O'Hare",runways:layouts.KORD,interval:10,emergencyEvery:65,weatherEvery:75,fuelFactor:.85,wave:5}
 };
 export const difficulties = Object.keys(airports) as Difficulty[];
 export function runwayName(game:{difficulty?:Difficulty;direction?:0|1},index:number){return game.difficulty?airports[game.difficulty].runways[index]?.ends[game.direction??0]??'?':index===0?'09':'27';}

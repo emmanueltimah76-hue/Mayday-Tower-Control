@@ -39,8 +39,14 @@ Create a room and choose **Start solo practice** to learn the controls without a
 
 Host-selectable Easy KPRC (3 runways), Medium KPHX (3), Hard KLAX (4), Expert KORD (8). Geometry uses OurAirports threshold coordinates retrieved 2026-10-03. True headings are distinct from magnetic runway numbers. Closed historical KORD runways are excluded. The stored source snapshot is airport-runways-source.json; source: https://github.com/davidmegginson/ourairports-data/blob/main/runways.csv.
 
-Taxiway A, gates G1–G6 and connecting routes are schematic game constructs, not claimed airport infrastructure. All paths and timing are controlled by the server; the browser interpolates positions for smooth display. Speed values are approach speeds; operational seconds are compressed for gameplay. Heavy wake delays are simplified (25 seconds for other traffic, 17 seconds for following heavies), not regulatory minima. Wind shifts defer until moving traffic clears, then retaxi queued departures.
+Taxiway A, gates G1–G6 and connecting routes are schematic game constructs, not claimed airport infrastructure. All paths and timing are controlled by the server; the browser interpolates positions for smooth display. Ground speed is integrated using a per-airport nautical-mile map scale. The server advances motion in 0.1-second steps; speeds are in knots and altitude is AGL feet. Ground travel now takes distance-based time. Heavy wake delays are simplified (25 seconds for other traffic, 17 seconds for following heavies), not regulatory minima. Wind shifts defer until moving traffic clears, then retaxi queued departures.
 
 Validation stages: A choose each airport as host and check guest synchronization; B compare aircraft profiles and arrival/departure waves; C land and taxi, queue departures, check heavy wake warnings; D watch reciprocal runway changes and occupied-short-final go-arounds. Physical-phone and cellular playtests remain outstanding.
 
 The original engine is retained as a regression fixture for calls without a difficulty; all actual lobby starts use the airport-aware engine.
+
+## Accuracy pass — Stage 1
+
+Heading is unwrapped and rate limited using shortest angular differences. Near-zero velocity does not change heading. Holding circuits and wind reroutes begin at the current aircraft position. Approach targets: light 70 kt, regional 130 kt, narrowbody 140 kt, heavy 150 kt. Taxi caps 16–18 kt, corner targets 6–8 kt. Rollout uses gradual braking; taxi acceleration and altitude changes are bounded. Debug toggle exposes selected-aircraft heading, ground speed, AGL altitude and state.
+
+Original regression tests remain; airport-aware timing tests now wait for physical arrival instead of the old fixed countdown. Stage 2 squawks/conflict alerts, Stage 3 verified routes/curves, and Stage 4 stands/map controls remain pending user approval. Existing taxi paths and holding geometry remain schematic.
