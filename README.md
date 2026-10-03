@@ -49,4 +49,10 @@ The original engine is retained as a regression fixture for calls without a diff
 
 Heading is unwrapped and rate limited using shortest angular differences. Near-zero velocity does not change heading. Holding circuits and wind reroutes begin at the current aircraft position. Approach targets: light 70 kt, regional 130 kt, narrowbody 140 kt, heavy 150 kt. Taxi caps 16–18 kt, corner targets 6–8 kt. Rollout uses gradual braking; taxi acceleration and altitude changes are bounded. Debug toggle exposes selected-aircraft heading, ground speed, AGL altitude and state.
 
-Original regression tests remain; airport-aware timing tests now wait for physical arrival instead of the old fixed countdown. Stage 2 squawks/conflict alerts, Stage 3 verified routes/curves, and Stage 4 stands/map controls remain pending user approval. Existing taxi paths and holding geometry remain schematic.
+Original regression tests remain; airport-aware timing tests now wait for physical arrival instead of the old fixed countdown. Stage 3 verified routes/curves and Stage 4 stands/map controls remain pending user approval. Existing taxi paths and holding geometry remain schematic.
+
+## Accuracy pass — Stage 2
+
+Radar blocks show callsign, type, ground speed in knots, altitude MSL feet (AGL plus airport elevation) and squawk. Normal codes are unique four-digit octal values, reserving 7500, 7600 and 7700; assigned normal codes remain reserved during special-code use. Emergencies share 7700 as appropriate; temporary radio failures use 7600 and restore normal codes after 25 seconds. Radio failures retain existing clearances.
+
+Server-generated alerts predict 15 seconds ahead using current headings and speeds, with compressed game thresholds of 0.12 NM / 100 ft and 0.18 NM behind a heavy. These are game rules, not regulatory ATC minima. Surface entry prediction checks five seconds ahead against schematic runway geometry. Alerts synchronize with room state, flash tracks, and sound only when enabled. Actual separation losses cost 100 points and incursions 75; sustained incidents are penalized once, while blocked clearances cost nothing. Forecasts use constant altitude and velocity; verified ground geometry and larger airspace remain later stages.

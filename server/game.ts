@@ -1,3 +1,4 @@
+import {assignSquawk,updateAlerts} from './alerts.js';
 import {flightProfiles,setRoute,advanceMotion,headingFromVelocity} from './motion.js';
 import type {Aircraft,AircraftType,Command,GameState} from '../src/protocol.js';
 import {airports,runwayName,runwayEnds,type Difficulty,type Point} from '../src/airports.js';
@@ -15,11 +16,11 @@ export function spawn(game:GameState,kind:'arrival'|'departure',emergency=false)
  const airline=(type==='heavy'?['AAL','UAL','DAL']:['AAL','SWA','UAL','DAL'])[number%(type==='heavy'?3:4)];
  const p:Aircraft={id:`flight-${number}`,callsign:type==='light'?`N${100+number}TC`:`${airline} ${100+number*17}${type==='heavy'?' HEAVY':''}`,kind,status:kind==='arrival'?'approach':'gate',aircraftType:type,speed:perf.speed,groundSpeed:kind==='arrival'?perf.speed:0,altitude:0,remaining:0,fuel:emergency?Math.round(40*config.fuelFactor):Math.round(perf.fuel*config.fuelFactor),revision:0,emergency,gate:`G${1+(number%6)}`,taxiway:'A',approachRunway:(number-1)%config.runways.length,approachTime:Math.round(50*config.fuelFactor)};
  if(kind==='arrival'){const [start,end]=runwayEnds(game,p.approachRunway!);p.position=extend(start,end,85);p.heading=Math.atan2(end[0]-start[0],-(end[1]-start[1]))*180/Math.PI;p.altitude=85*config.nmPerUnit*318;}else p.position=gatePoint(p);
- game.aircraft.push(p);
+ p.normalSquawk=assignSquawk(game);p.squawk=emergency?'7700':p.normalSquawk;game.aircraft.push(p);
 }
 export function createGame(players:number,difficulty?:Difficulty):GameState{
  if(!difficulty)return legacy.createGame(players);
- const c=airports[difficulty];const game:GameState={difficulty,direction:0,wind:{heading:difficulty==='expert'?90:c.runways[0].heading,speed:8},nextWind:155,wakeUntil:{},waveRemaining:0,nextWave:25,aircraft:[],score:0,handled:0,missed:0,unsafe:0,secondsLeft:420,elapsed:0,sequence:0,nextSpawn:25,trafficInterval:Math.max(7,c.interval-Math.max(0,players-2)),nextWeather:c.weatherEvery,nextEmergency:c.emergencyEvery,emergenciesHandled:0};spawn(game,'arrival');spawn(game,'departure');return game;
+ const c=airports[difficulty];const game:GameState={difficulty,direction:0,wind:{heading:difficulty==='expert'?90:c.runways[0].heading,speed:8},nextRadioLoss:110,alerts:[],separationLosses:0,incursions:0,nextWind:155,wakeUntil:{},waveRemaining:0,nextWave:25,aircraft:[],score:0,handled:0,missed:0,unsafe:0,secondsLeft:420,elapsed:0,sequence:0,nextSpawn:25,trafficInterval:Math.max(7,c.interval-Math.max(0,players-2)),nextWeather:c.weatherEvery,nextEmergency:c.emergencyEvery,emergenciesHandled:0};spawn(game,'arrival');spawn(game,'departure');return game;
 }
 function intersects(a:Point,b:Point,c:Point,d:Point){const cross=(p:Point,q:Point,r:Point)=>(q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]);return cross(a,b,c)*cross(a,b,d)<0&&cross(c,d,a)*cross(c,d,b)<0;}
 export function runwayBusy(game:GameState,index:number){if(!game.difficulty)return legacy.runwayBusy(game,index);const r=airports[game.difficulty].runways[index];if(!r)return true;return game.aircraft.some(p=>p.runway!==undefined&&['landing','takeoff','taxi-in'].includes(p.status)&&!p.onFinal&&(p.runway===index||intersects(r.start,r.end,airports[game.difficulty!].runways[p.runway].start,airports[game.difficulty!].runways[p.runway].end)));}
@@ -33,7 +34,7 @@ export function command(game:GameState,id:unknown,action:Command,runway:unknown,
  if(assign||action==='takeoff'){
   const index=r as number;
   if(game.weather?.runway===index)return {error:'Runway closed by crosswinds. Use another runway.'};
-  if(runwayBusy(game,index)){game.score-=25;game.unsafe++;return {error:'Runway or crossing runway occupied. Unsafe clearance rejected (−25).',changed:true};}
+  if(runwayBusy(game,index)){return {error:'Runway or crossing runway occupied. Unsafe clearance rejected; no penalty because entry was prevented.'};}
   if((action==='land'||action==='takeoff')&&wakeRemaining(game,index,p)>0)return {error:`Wake turbulence: wait ${wakeRemaining(game,index,p)}s before clearing ${p.callsign}.`};
  }
  if(assign)p.runway=r as number;
@@ -54,6 +55,9 @@ export function tickGame(game:GameState,seconds:number,emit:(s:string)=>void){
  const config=airports[game.difficulty];
  for(let n=0;n<seconds&&game.secondsLeft>0;n++){
   game.elapsed++;game.secondsLeft--;
+  for(const p of game.aircraft)if(p.radioLost&&game.elapsed>=(p.radioRestoreAt??0)){p.radioLost=false;p.squawk=p.emergency?'7700':p.normalSquawk;p.revision++;emit(`${p.callsign}, radio contact restored, squawk ${p.squawk}.`);}
+  if(game.elapsed>=(game.nextRadioLoss??110)&&game.secondsLeft>50){const p=game.aircraft.find(p=>!p.emergency&&!p.radioLost&&['approach','holding'].includes(p.status));if(p){p.radioLost=true;p.squawk='7600';p.radioRestoreAt=game.elapsed+25;p.revision++;emit(`${p.callsign}, radio contact lost, squawk 7600. Existing clearances remain active.`);}game.nextRadioLoss=game.elapsed+130;}
+
   for(const p of [...game.aircraft]){
    if(['approach','holding','go-around','gate','queued'].includes(p.status)||p.onFinal){p.fuel--;if(p.fuel<=0){game.aircraft=game.aircraft.filter(a=>a!==p);game.score-=p.emergency?150:50;game.missed++;emit(`${p.callsign}, ${p.kind==='arrival'?'diverting':'departure cancelled'} (${p.emergency?'−150':'−50'}).`);continue;}}
    let arrived=false;
@@ -84,6 +88,7 @@ export function tickGame(game:GameState,seconds:number,emit:(s:string)=>void){
     }
    }
   }
+  updateAlerts(game,emit);
   if(game.weather&&game.elapsed>=game.weather.endsAt){emit(`Tower: runway ${runwayName(game,game.weather.runway)} reopened.`);game.weather=undefined;}
   if(game.elapsed>=game.nextWeather&&game.secondsLeft>40){const r=config.runways.findIndex((_,i)=>!runwayBusy(game,i)&&!game.aircraft.some(p=>p.status==='final'&&p.runway===i));if(r>=0){game.weather={runway:r,endsAt:game.elapsed+25};game.nextWeather=game.elapsed+config.weatherEvery;emit(`Crosswinds! Runway ${runwayName(game,r)} closed for 25 seconds.`);}else game.nextWeather=game.elapsed+5;}
   if(game.elapsed>=game.nextEmergency&&game.secondsLeft>40){if(game.aircraft.length<18){spawn(game,'arrival',true);emit(`MAYDAY! ${game.aircraft.at(-1)!.callsign}, low fuel, priority landing requested.`);game.nextEmergency=game.elapsed+config.emergencyEvery;}else game.nextEmergency=game.elapsed+5;}
