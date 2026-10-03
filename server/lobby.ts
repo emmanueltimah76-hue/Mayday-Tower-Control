@@ -1,3 +1,4 @@
+import {Rankings} from './rankings.js';
 import {airports,type Difficulty} from '../src/airports.js';
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { createGame, command, tickGame } from './game.js';
@@ -6,7 +7,7 @@ import { quickMessages } from '../src/protocol.js';
 import type { ClientMessage, RoomState, ServerMessage } from '../src/protocol.js';
 export interface Peer { send(message: ServerMessage): void; close(): void }
 type Member = { id: string; nickname: string; token: string; peer?: Peer; deadline?: number; selectedAircraft?: string; lastQuick?: number };
-type Room = { code: string; hostId: string; phase: 'lobby' | 'started' | 'finished'; practice?: boolean; difficulty?:Difficulty; game?: GameState; lastTick?: number; members: Member[]; events: { id: number; text: string }[]; revision: number; touched: number };
+type Room = { roundCrew?:string[]; code: string; hostId: string; phase: 'lobby' | 'started' | 'finished'; practice?: boolean; difficulty?:Difficulty; game?: GameState; lastTick?: number; members: Member[]; events: { id: number; text: string }[]; revision: number; touched: number };
 export class Lobby {
   private startedAt = Date.now();
   private measuredAt = this.startedAt;
@@ -30,7 +31,7 @@ export class Lobby {
   rooms = new Map<string, Room>();
   sessions = new Map<string, { room: Room; member: Member }>();
   peers = new Map<Peer, { room: Room; member: Member }>();
-  constructor(private graceMs = 30_000, private idleMs = 30 * 60_000) {}
+  constructor(private graceMs = 30_000, private idleMs = 30 * 60_000, public rankings = new Rankings()) {}
   error(peer: Peer, code: string, message: string) { peer.send({ type: 'error', code, message }); }
   event(room: Room, text: string) { room.events.push({ id: ++room.revision, text }); room.events = room.events.slice(-20); }
   state(room: Room): RoomState { return { code: room.code, hostId: room.hostId, phase: room.phase, practice: room.practice, difficulty:room.difficulty??'easy', game: room.game, revision: room.revision, players: room.members.map(m => ({ id: m.id, nickname: m.nickname, connected: !!m.peer, selectedAircraft: m.selectedAircraft })), events: room.events }; }
@@ -90,7 +91,7 @@ export class Lobby {
       if (room.phase !== 'lobby') return this.error(peer, 'STARTED', 'The session has already started.');
       if (msg.type === 'practice' && room.members.length !== 1) return this.error(peer, 'PRACTICE_ONLY', 'Solo practice is for one player. Start a crew session instead.');
       if (msg.type === 'start' && room.members.filter(m => m.peer).length < 2) return this.error(peer, 'NEED_PLAYERS', 'At least two connected players are needed.');
-      this.rounds++; if (msg.type === 'practice') this.practiceRounds++; room.practice = msg.type === 'practice'; room.game = createGame(room.members.filter(m => m.peer).length,room.difficulty??'easy'); room.lastTick = Date.now(); room.phase = 'started'; this.event(room, room.practice ? 'Solo practice started. You control every flight.' : 'The host started the session.'); this.broadcast(room); return;
+      room.roundCrew=room.members.filter(m=>m.peer).map(m=>m.nickname);this.rounds++; if (msg.type === 'practice') this.practiceRounds++; room.practice = msg.type === 'practice'; room.game = createGame(room.members.filter(m => m.peer).length,room.difficulty??'easy'); room.lastTick = Date.now(); room.phase = 'started'; this.event(room, room.practice ? 'Solo practice started. You control every flight.' : 'The host started the session.'); this.broadcast(room); return;
     }
     if (msg.type === 'select') {
       const { room, member } = session;
@@ -130,7 +131,7 @@ export class Lobby {
       room.lastTick += seconds * 1000;
       tickGame(room.game, seconds, text => this.event(room, text));
       for (const m of room.members) if (!room.game.aircraft.some(a => a.id === m.selectedAircraft)) m.selectedAircraft = undefined;
-      if (room.game.secondsLeft === 0) { this.completed++; room.phase = 'finished'; this.event(room, 'Shift complete. Your crew can play again.'); }
+      if (room.game.secondsLeft === 0) { this.completed++; this.rankings.record(room.game,room.roundCrew??room.members.map(m=>m.nickname),!!room.practice);room.phase = 'finished'; this.event(room, 'Shift complete. Your crew can play again.'); }
       this.broadcast(room);
     }
   }

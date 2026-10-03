@@ -1,3 +1,5 @@
+import {Rankings} from './rankings.js';
+import {airports,type Difficulty} from '../src/airports.js';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
@@ -8,6 +10,8 @@ const vite = production ? null : await (await import('vite')).createServer({ ser
 const root = resolve('dist');
 const mime: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
+  if (req.url?.startsWith('/api/rankings')) {const url=new URL(req.url,'http://localhost'),difficulty=url.searchParams.get('difficulty')??'easy',mode=url.searchParams.get('mode')==='practice'?'practice':'crew';if(!Object.hasOwn(airports,difficulty)){res.writeHead(400);res.end('Invalid difficulty');return;}res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({entries:lobby.rankings.list(difficulty as Difficulty,mode),storage:lobby.rankings.durableConfigured?'file':'session',note:'Free Render storage resets on restart or deployment. No login; nickname identity is unverified.'}));return;}
+  if(req.url==='/leaderboard'||req.url==='/leaderboard/'){res.writeHead(200,{'Content-Type':'text/html','Cache-Control':'no-store'});res.end(await readFile(resolve(production?'dist/leaderboard.html':'public/leaderboard.html')));return;}
   if (req.url === '/api/stats') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(lobby.stats())); return; }
   if (req.url === '/dashboard' || req.url === '/dashboard/') { res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' }); res.end(await readFile(resolve(production ? 'dist/dashboard.html' : 'public/dashboard.html'))); return; }
   if (req.url === '/health') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}'); return; }
@@ -19,7 +23,7 @@ const server = createServer(async (req, res) => {
     const content = await readFile(file); res.writeHead(200, { 'Content-Type': mime[extname(file)] ?? 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' }); res.end(content);
   } catch { res.writeHead(404); res.end('Not found'); }
 });
-const lobby = new Lobby();
+const lobby = new Lobby(30_000,30*60_000,new Rankings(process.env.RANKINGS_FILE));
 const wss = new WebSocketServer({ noServer: true, maxPayload: 4096 });
 server.on('upgrade', (req, socket, head) => {
   if (req.url !== '/ws') { if (vite && req.headers['sec-websocket-protocol'] === 'vite-hmr') return; socket.destroy(); return; }
