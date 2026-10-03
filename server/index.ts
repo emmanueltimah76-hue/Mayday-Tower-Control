@@ -8,6 +8,8 @@ const vite = production ? null : await (await import('vite')).createServer({ ser
 const root = resolve('dist');
 const mime: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
+  if (req.url === '/api/stats') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(lobby.stats())); return; }
+  if (req.url === '/dashboard' || req.url === '/dashboard/') { res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' }); res.end(await readFile(resolve(production ? 'dist/dashboard.html' : 'public/dashboard.html'))); return; }
   if (req.url === '/health') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}'); return; }
   if (vite) { vite.middlewares(req, res); return; }
   try {

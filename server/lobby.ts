@@ -7,6 +7,25 @@ export interface Peer { send(message: ServerMessage): void; close(): void }
 type Member = { id: string; nickname: string; token: string; peer?: Peer; deadline?: number; selectedAircraft?: string; lastQuick?: number };
 type Room = { code: string; hostId: string; phase: 'lobby' | 'started' | 'finished'; practice?: boolean; game?: GameState; lastTick?: number; members: Member[]; events: { id: number; text: string }[]; revision: number; touched: number };
 export class Lobby {
+  private startedAt = Date.now();
+  private measuredAt = this.startedAt;
+  private playerMs = 0;
+  private playMs = 0;
+  private joins = 0;
+  private rounds = 0;
+  private completed = 0;
+  private practiceRounds = 0;
+  private measure(now = Date.now()) {
+    const delta = Math.max(0, now - this.measuredAt);
+    this.playerMs += this.peers.size * delta;
+    this.playMs += [...this.peers.values()].filter(s => s.room.phase === 'started').length * delta;
+    this.measuredAt = Math.max(this.measuredAt, now);
+  }
+  stats(now = Date.now()) {
+    this.measure(now);
+    const rooms = [...this.rooms.values()];
+    return { since: this.startedAt, updatedAt: now, connectedPlayers: this.peers.size, activeRooms: rooms.length, playingRooms: rooms.filter(r => r.phase === 'started').length, lobbyRooms: rooms.filter(r => r.phase === 'lobby').length, finishedRooms: rooms.filter(r => r.phase === 'finished').length, roomJoins: this.joins, shiftsStarted: this.rounds, shiftsCompleted: this.completed, soloShifts: this.practiceRounds, connectedPlayerSeconds: Math.floor(this.playerMs / 1000), gameplayPlayerSeconds: Math.floor(this.playMs / 1000), averageVisitSeconds: this.joins ? Math.floor(this.playerMs / 1000 / this.joins) : 0 };
+  }
   rooms = new Map<string, Room>();
   sessions = new Map<string, { room: Room; member: Member }>();
   peers = new Map<Peer, { room: Room; member: Member }>();
@@ -21,6 +40,7 @@ export class Lobby {
     peer.send({ type: 'session', token: member.token, playerId: member.id });
   }
   handle(peer: Peer, raw: unknown) {
+    this.measure();
     if (!raw || typeof raw !== 'object' || !('type' in raw)) return this.error(peer, 'BAD_REQUEST', 'Unrecognized request.');
     const msg = raw as ClientMessage;
     if (msg.type === 'create' || msg.type === 'join') {
@@ -43,7 +63,7 @@ export class Lobby {
         if (room.members.some(m => m.nickname.toLowerCase() === nickname.toLowerCase())) return this.error(peer, 'DUPLICATE', 'That nickname is taken in this room. Choose another.');
       }
       const member: Member = { id: randomUUID(), nickname, token: randomBytes(32).toString('hex') };
-      room.members.push(member); if (!room.hostId) room.hostId = member.id;
+      this.joins++; room.members.push(member); if (!room.hostId) room.hostId = member.id;
       this.sessions.set(member.token, { room, member }); this.attach(peer, room, member);
       this.event(room, `${nickname} joined the crew.`); this.broadcast(room); return;
     }
@@ -62,7 +82,7 @@ export class Lobby {
       if (room.phase !== 'lobby') return this.error(peer, 'STARTED', 'The session has already started.');
       if (msg.type === 'practice' && room.members.length !== 1) return this.error(peer, 'PRACTICE_ONLY', 'Solo practice is for one player. Start a crew session instead.');
       if (msg.type === 'start' && room.members.filter(m => m.peer).length < 2) return this.error(peer, 'NEED_PLAYERS', 'At least two connected players are needed.');
-      room.practice = msg.type === 'practice'; room.game = createGame(room.members.filter(m => m.peer).length); room.lastTick = Date.now(); room.phase = 'started'; this.event(room, room.practice ? 'Solo practice started. You control every flight.' : 'The host started the session.'); this.broadcast(room); return;
+      this.rounds++; if (msg.type === 'practice') this.practiceRounds++; room.practice = msg.type === 'practice'; room.game = createGame(room.members.filter(m => m.peer).length); room.lastTick = Date.now(); room.phase = 'started'; this.event(room, room.practice ? 'Solo practice started. You control every flight.' : 'The host started the session.'); this.broadcast(room); return;
     }
     if (msg.type === 'select') {
       const { room, member } = session;
@@ -94,6 +114,7 @@ export class Lobby {
     this.error(peer, 'BAD_REQUEST', 'Unrecognized request.');
   }
   tick(now = Date.now()) {
+    this.measure(now);
     for (const room of this.rooms.values()) {
       if (room.phase !== 'started' || !room.game || room.lastTick === undefined) continue;
       const seconds = Math.floor((now - room.lastTick) / 1000);
@@ -101,12 +122,13 @@ export class Lobby {
       room.lastTick += seconds * 1000;
       tickGame(room.game, seconds, text => this.event(room, text));
       for (const m of room.members) if (!room.game.aircraft.some(a => a.id === m.selectedAircraft)) m.selectedAircraft = undefined;
-      if (room.game.secondsLeft === 0) { room.phase = 'finished'; this.event(room, 'Shift complete. Your crew can play again.'); }
+      if (room.game.secondsLeft === 0) { this.completed++; room.phase = 'finished'; this.event(room, 'Shift complete. Your crew can play again.'); }
       this.broadcast(room);
     }
   }
-  disconnect(peer: Peer) { const session = this.peers.get(peer); if (!session) return; this.peers.delete(peer); session.member.peer = undefined; session.member.selectedAircraft = undefined; session.member.deadline = Date.now() + this.graceMs; this.event(session.room, `${session.member.nickname} lost connection. Holding their place for 30 seconds.`); this.broadcast(session.room); }
+  disconnect(peer: Peer) { this.measure(); const session = this.peers.get(peer); if (!session) return; this.peers.delete(peer); session.member.peer = undefined; session.member.selectedAircraft = undefined; session.member.deadline = Date.now() + this.graceMs; this.event(session.room, `${session.member.nickname} lost connection. Holding their place for 30 seconds.`); this.broadcast(session.room); }
   remove(room: Room, member: Member) {
+    this.measure();
     if (member.peer) this.peers.delete(member.peer); this.sessions.delete(member.token); room.members = room.members.filter(m => m !== member);
     this.event(room, `${member.nickname} left the crew.`);
     if (!room.members.length) { this.rooms.delete(room.code); return; }
