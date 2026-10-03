@@ -29,8 +29,18 @@ Open How to play in the lobby or during a round. Aircraft selection opens a fixe
 
 ## Remaining work
 
-Separate physical-device playtesting, public hosting and contest submission assets. Confirm the separate Handshake mission instructions before submission.
+Separate physical-device playtesting and feedback. The game and dashboard are publicly hosted. Confirm the separate Handshake mission instructions before submission.
 
 ## Solo practice
 
 Create a room and choose **Start solo practice** to learn the controls without another player. Practice uses the same seven-minute shift and scoring. Return to the lobby after the shift to invite friends. Multiplayer requires 2–6 connected players.
+
+## Realism upgrade
+
+Host-selectable Easy KPRC (3 runways), Medium KPHX (3), Hard KLAX (4), Expert KORD (8). Geometry uses OurAirports threshold coordinates retrieved 2026-10-03. True headings are distinct from magnetic runway numbers. Closed historical KORD runways are excluded. The stored source snapshot is airport-runways-source.json; source: https://github.com/davidmegginson/ourairports-data/blob/main/runways.csv.
+
+Taxiway A, gates G1–G6 and connecting routes are schematic game constructs, not claimed airport infrastructure. All paths and timing are controlled by the server; the browser interpolates positions for smooth display. Speed values are approach speeds; operational seconds are compressed for gameplay. Heavy wake delays are simplified (25 seconds for other traffic, 17 seconds for following heavies), not regulatory minima. Wind shifts defer until moving traffic clears, then retaxi queued departures.
+
+Validation stages: A choose each airport as host and check guest synchronization; B compare aircraft profiles and arrival/departure waves; C land and taxi, queue departures, check heavy wake warnings; D watch reciprocal runway changes and occupied-short-final go-arounds. Physical-phone and cellular playtests remain outstanding.
+
+The original engine is retained as a regression fixture for calls without a difficulty; all actual lobby starts use the airport-aware engine.

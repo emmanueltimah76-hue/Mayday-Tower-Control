@@ -1,3 +1,4 @@
+import {airports,type Difficulty} from '../src/airports.js';
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { createGame, command, tickGame } from './game.js';
 import type { GameState } from '../src/protocol.js';
@@ -5,7 +6,7 @@ import { quickMessages } from '../src/protocol.js';
 import type { ClientMessage, RoomState, ServerMessage } from '../src/protocol.js';
 export interface Peer { send(message: ServerMessage): void; close(): void }
 type Member = { id: string; nickname: string; token: string; peer?: Peer; deadline?: number; selectedAircraft?: string; lastQuick?: number };
-type Room = { code: string; hostId: string; phase: 'lobby' | 'started' | 'finished'; practice?: boolean; game?: GameState; lastTick?: number; members: Member[]; events: { id: number; text: string }[]; revision: number; touched: number };
+type Room = { code: string; hostId: string; phase: 'lobby' | 'started' | 'finished'; practice?: boolean; difficulty?:Difficulty; game?: GameState; lastTick?: number; members: Member[]; events: { id: number; text: string }[]; revision: number; touched: number };
 export class Lobby {
   private startedAt = Date.now();
   private measuredAt = this.startedAt;
@@ -32,7 +33,7 @@ export class Lobby {
   constructor(private graceMs = 30_000, private idleMs = 30 * 60_000) {}
   error(peer: Peer, code: string, message: string) { peer.send({ type: 'error', code, message }); }
   event(room: Room, text: string) { room.events.push({ id: ++room.revision, text }); room.events = room.events.slice(-20); }
-  state(room: Room): RoomState { return { code: room.code, hostId: room.hostId, phase: room.phase, practice: room.practice, game: room.game, revision: room.revision, players: room.members.map(m => ({ id: m.id, nickname: m.nickname, connected: !!m.peer, selectedAircraft: m.selectedAircraft })), events: room.events }; }
+  state(room: Room): RoomState { return { code: room.code, hostId: room.hostId, phase: room.phase, practice: room.practice, difficulty:room.difficulty??'easy', game: room.game, revision: room.revision, players: room.members.map(m => ({ id: m.id, nickname: m.nickname, connected: !!m.peer, selectedAircraft: m.selectedAircraft })), events: room.events }; }
   broadcast(room: Room) { room.revision++; room.touched = Date.now(); const message: ServerMessage = { type: 'state', room: this.state(room) }; for (const m of room.members) m.peer?.send(message); }
   attach(peer: Peer, room: Room, member: Member) {
     if (member.peer && member.peer !== peer) { this.peers.delete(member.peer); member.peer.close(); }
@@ -52,7 +53,7 @@ export class Lobby {
         if (this.rooms.size >= 500) return this.error(peer, 'CAPACITY', 'The tower is busy. Try again shortly.');
         let code = ''; const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
         do { code = Array.from({ length: 5 }, () => alphabet[randomInt(alphabet.length)]).join(''); } while (this.rooms.has(code));
-        room = { code, hostId: '', phase: 'lobby', members: [], events: [], revision: 0, touched: Date.now() }; this.rooms.set(code, room);
+        room = { code, hostId: '', phase: 'lobby', difficulty:'easy', members: [], events: [], revision: 0, touched: Date.now() }; this.rooms.set(code, room);
       } else {
         const code = typeof msg.code === 'string' ? msg.code.trim().toUpperCase() : '';
         const found = this.rooms.get(code);
@@ -76,13 +77,20 @@ export class Lobby {
     const session = this.peers.get(peer);
     if (!session) return this.error(peer, 'NO_SESSION', 'Create or join a room first.');
     if (msg.type === 'leave') { this.remove(session.room, session.member); peer.send({ type: 'left' }); return; }
+    if (msg.type === 'difficulty') {
+      const {room,member}=session;
+      if(room.hostId!==member.id)return this.error(peer,'HOST_ONLY','Only the host can choose difficulty.');
+      if(room.phase!=='lobby')return this.error(peer,'ACTIVE','Choose an airport in the lobby.');
+      if(typeof msg.difficulty!=='string'||!Object.hasOwn(airports,msg.difficulty))return this.error(peer,'DIFFICULTY','Choose an available difficulty.');
+      room.difficulty=msg.difficulty;this.event(room,`Airport selected: ${airports[msg.difficulty].name} (${airports[msg.difficulty].code}).`);this.broadcast(room);return;
+    }
     if (msg.type === 'start' || msg.type === 'practice') {
       const { room, member } = session;
       if (room.hostId !== member.id) return this.error(peer, 'HOST_ONLY', 'Only the host can start the session.');
       if (room.phase !== 'lobby') return this.error(peer, 'STARTED', 'The session has already started.');
       if (msg.type === 'practice' && room.members.length !== 1) return this.error(peer, 'PRACTICE_ONLY', 'Solo practice is for one player. Start a crew session instead.');
       if (msg.type === 'start' && room.members.filter(m => m.peer).length < 2) return this.error(peer, 'NEED_PLAYERS', 'At least two connected players are needed.');
-      this.rounds++; if (msg.type === 'practice') this.practiceRounds++; room.practice = msg.type === 'practice'; room.game = createGame(room.members.filter(m => m.peer).length); room.lastTick = Date.now(); room.phase = 'started'; this.event(room, room.practice ? 'Solo practice started. You control every flight.' : 'The host started the session.'); this.broadcast(room); return;
+      this.rounds++; if (msg.type === 'practice') this.practiceRounds++; room.practice = msg.type === 'practice'; room.game = createGame(room.members.filter(m => m.peer).length,room.difficulty??'easy'); room.lastTick = Date.now(); room.phase = 'started'; this.event(room, room.practice ? 'Solo practice started. You control every flight.' : 'The host started the session.'); this.broadcast(room); return;
     }
     if (msg.type === 'select') {
       const { room, member } = session;
