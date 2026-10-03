@@ -2,7 +2,7 @@ import type { Aircraft, Command, GameState } from '../src/protocol.js';
 const waiting = new Set(['approach','holding','gate','queued']);
 export function spawn(game: GameState, kind: 'arrival' | 'departure', emergency = false) {
  const number=++game.sequence;
- game.aircraft.push({id:`flight-${number}`,callsign:`MD${String(100+number)}`,kind,status:kind==='arrival'?'approach':'gate',remaining:0,fuel:emergency?35:kind==='arrival'?90:120,revision:0,emergency});
+ game.aircraft.push({id:`flight-${number}`,callsign:`N${String(100+number)}TC`,kind,status:kind==='arrival'?'approach':'gate',remaining:0,fuel:emergency?35:kind==='arrival'?90:120,revision:0,emergency});
 }
 export function createGame(players: number): GameState {
  const game: GameState={aircraft:[],score:0,handled:0,missed:0,unsafe:0,secondsLeft:420,elapsed:0,sequence:0,nextSpawn:15,trafficInterval:Math.max(10,20-players*2),nextWeather:75,nextEmergency:45,emergenciesHandled:0};
