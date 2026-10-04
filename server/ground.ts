@@ -10,7 +10,7 @@ function segments(p:Aircraft):[Point,Point][]{if(!p.route||!p.position)return []
 function obstacles(game:GameState,p:Aircraft):Obstacle[]{return [
  ...game.aircraft.filter(q=>q.id!==p.id&&onGround(q)).map(q=>({a:q.position!,b:q.position!,radius:groundGap(p,q),name:q.callsign})),
  ...terminalBlocks(game.difficulty!).map(t=>({a:t.center,b:t.center,radius:Math.hypot(t.width,t.height)/2+groundRadius(p)+feetToUnits(30),name:t.name})),
- ...airports[game.difficulty!].runways.flatMap((r,i)=>i===p.runway&&(p.kind==='arrival'||p.status==='takeoff')?[]:[{a:r.start,b:r.end,radius:feetToUnits(100)+groundRadius(p),name:`Runway ${i+1}`}])
+ ...airports[game.difficulty!].runways.flatMap((r,i)=>i===p.runway&&(p.status==='takeoff'||p.kind==='arrival'&&pointSegmentDistance(p.position!,r.start,r.end)<feetToUnits(100)+groundRadius(p))?[]:[{a:r.start,b:r.end,radius:feetToUnits(100)+groundRadius(p),name:`Runway ${i+1}`}])
  ];}
 function clearEdge(a:Point,b:Point,list:Obstacle[],origin:Point){return list.every(o=>pointSegmentDistance(origin,o.a,o.b)<o.radius&&distance(a,origin)<.001?pointSegmentDistance(b,o.a,o.b)>=o.radius:segmentDistance(a,b,o.a,o.b)>=o.radius-.0001);}
 export function routeSafe(game:GameState,p:Aircraft,points:Point[]){const list=obstacles(game,p);if(!points.slice(1).every((q,i)=>clearEdge(points[i],q,list,points[0])))return false;const own=p.runway===undefined?undefined:airports[game.difficulty!].runways[p.runway];if(own&&p.kind==='arrival'){const width=feetToUnits(100)+groundRadius(p);let exited=pointSegmentDistance(points[0],own.start,own.end)>=width;for(let i=1;i<points.length;i++){if(exited&&segmentDistance(points[i-1],points[i],own.start,own.end)<width-.0001)return false;if(pointSegmentDistance(points[i],own.start,own.end)>=width)exited=true;}}return true;}
@@ -35,7 +35,10 @@ export function planGroundRoute(game:GameState,p:Aircraft,requested:Point[]):Poi
 
  // Visibility graph over the schematic centerline and marked bypass connectors.
  // Reserve the complete traversal atomically before leaving a safe holding point.
- const nodes:Point[]=[origin,end,...requested.slice(1,-1)];
+ // Dense sampled arcs are not visibility-graph nodes: preserve at most 64 connectors.
+ const coarse=requested.filter((q,i)=>i===0||i===requested.length-1||distance(q,requested[Math.max(0,i-1)])>=3);
+ const connectors=coarse.slice(1,-1).filter((_,i,points)=>i%Math.max(1,Math.ceil(points.length/64))===0);
+ const nodes:Point[]=[origin,end,...connectors];
  for(const o of list){const padding=o.radius+radius*3+feetToUnits(25);for(const c of [o.a,o.b])for(let i=0;i<8;i++){const h=i*Math.PI/4;nodes.push([c[0]+Math.cos(h)*padding/Math.cos(Math.PI/8),c[1]+Math.sin(h)*padding/Math.cos(Math.PI/8)]);}}
  const costs=nodes.map(()=>Infinity),prev=nodes.map(()=>-1),done=new Set<number>();costs[0]=0;
  for(let step=0;step<nodes.length;step++){let best=-1;for(let i=0;i<nodes.length;i++)if(!done.has(i)&&(best<0||costs[i]<costs[best]))best=i;if(best<0||!Number.isFinite(costs[best]))break;if(best===1){const path:Point[]=[];for(let i=1;i>=0;i=prev[i]){path.unshift(nodes[i]);if(i===0)break;}return finish(path);}done.add(best);for(let j=0;j<nodes.length;j++)if(!done.has(j)&&clearEdge(nodes[best],nodes[j],list,origin)){const cost=costs[best]+distance(nodes[best],nodes[j]);if(cost<costs[j]){costs[j]=cost;prev[j]=best;}}}
@@ -99,7 +102,7 @@ export function advanceGround(game:GameState,p:Aircraft,dt:number,emit:(s:string
  // Atomic route acquisition removes cycles: no aircraft owns one conflict area
  // while waiting for another. Waiting planes retain their position / stand.
  p.groundSpeedLimit=p.groundReserved?undefined:0;
- const result=structuredClone(p);const arrived=advanceMotion(result,dt);
+ const result={...p,position:[...before] as Point};const arrived=advanceMotion(result,dt);
  const blocker=game.aircraft.find(q=>q.id!==p.id&&onGround(q)&&segmentDistance(before,result.position!,q.position!,q.position!)<groundGap(p,q)-1e-6);
  if(blocker){p.groundSpeed=Math.max(0,speed-profile.brake*dt);wait(p,`Traffic ahead: ${blocker.callsign}.`,game,emit);p.groundSpeedLimit=originalCap;return false;}
  if(!p.groundReserved&&speed<.05){p.groundSpeed=0;p.groundSpeedLimit=originalCap;return false;}

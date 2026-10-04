@@ -1,0 +1,58 @@
+✔ 420-second stress invariant: alignment (1.229175ms)
+✔ 420-second stress invariant: speed (0.123637ms)
+✔ 420-second stress invariant: turnRate (0.121442ms)
+✔ 420-second stress invariant: paths (0.098287ms)
+✔ 420-second stress invariant: runwayOwnership (0.109657ms)
+✔ 420-second stress invariant: legalTransitions (0.102274ms)
+✔ 420-second stress invariant: sixPlayerSync (0.124613ms)
+✖ stabilized touchdown rollout respects the aircraft turn limit (2.025235ms)
+✖ runway ownership releases after physical runway exit (0.720711ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 7
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15359.3411
+
+✖ failing tests:
+
+test at scripts/movement-invariants.test.ts:1:1147
+✖ stabilized touchdown rollout respects the aircraft turn limit (2.025235ms)
+  AssertionError [ERR_ASSERTION]: {"peakTurnDegPerSecond":64.22939718921043,"maxTravelHeadingError":1.1368683772161603e-12,"headingToleranceAtTouchdown":7,"groundTurnLimit":18}
+      at TestContext.<anonymous> (/Users/flightdeck.em/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/mayday/scripts/movement-invariants.test.ts:7:81)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/movement-invariants.test.ts:1:1338
+✖ runway ownership releases after physical runway exit (0.720711ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/Users/flightdeck.em/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/mayday/scripts/movement-invariants.test.ts:8:72)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,58 @@
+{
+  "base": "/Users/flightdeck.em/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/mayday",
+  "noHold": true,
+  "seed": 2703,
+  "difficulty": "hard",
+  "seconds": 420,
+  "players": 6,
+  "maxAircraft": 10,
+  "accepted": 13,
+  "rejected": 2507,
+  "sampleChecks": 34430,
+  "landed": 2,
+  "failures": {},
+  "slowestTicks": [
+    {
+      "aircraft": 8,
+      "ms": 2717.3441729999995,
+      "bytes": 205910
+    },
+    {
+      "aircraft": 8,
+      "ms": 52.53937699999915,
+      "bytes": 205765
+    },
+    {
+      "aircraft": 8,
+      "ms": 47.79312799999934,
+      "bytes": 204680
+    },
+    {
+      "aircraft": 9,
+      "ms": 47.406120999999985,
+      "bytes": 207944
+    }
+  ],
+  "tickMs": {
+    "median": 31.00156599999991,
+    "p95": 42.57912600000054,
+    "max": 2717.3441729999995
+  },
+  "snapshotBytes": {
+    "median": 181118,
+    "max": 211765,
+    "sixClientsMax": 1270590
+  },
+  "density": {
+    "light": {
+      "ticks": 60,
+      "meanMs": 7.5440389833333334,
+      "meanSnapshotBytes": 39298.15
+    },
+    "heavy": {
+      "ticks": 207,
+      "meanMs": 35.625524821256015,
+      "meanSnapshotBytes": 197525.28985507245
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "sampleCount": 12657,
+  "hotspots": [
+    {
+      "function": "advanceGround",
+      "source": "file:///Users/flightdeck.em/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/mayday/server/ground.ts",
+      "samples": 3626
+    },
+    {
+      "function": "structuredClone",
+      "source": "node:internal/worker/js_transferable",
+      "samples": 3360
+    },
+    {
+      "function": "__name",
+      "source": "file:///Users/flightdeck.em/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/mayday/src/groundGeometry.ts",
+      "samples": 966
+    },
+    {
+      "function": "set TextDecoder",
+      "source": "",
+      "samples": 948
+    },
+    {
+      "function": "pointSegmentDistance",
+      "source": "file:///Users/flightdeck.em/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/mayday/src/groundGeometry.ts",
+      "samples": 629
+    },
+    {
+      "function": "",
+      "source": "file:///Users/flightdeck.em/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/mayday/server/ground.ts",
+      "samples": 409
+    },
+    {
+      "function": "segmentDistance",
+      "source": "file:///Users/flightdeck.em/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/mayday/src/groundGeometry.ts",
+      "samples": 397
+    },
+    {
+      "function": "",
+      "source": "file:///Users/flightdeck.em/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/mayday/scripts/movement-audit.ts",
+      "samples": 374
+    },
+    {
+      "function": "",
+      "source": "file:///Users/flightdeck.em/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/mayday/server/motion.ts",
+      "samples": 299
+    },
+    {
+      "function": "structuredClone",
+      "source": "",
+      "samples": 240
+    },
+    {
+      "function": "remainingDistance",
+      "source": "file:///Users/flightdeck.em/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/mayday/server/motion.ts",
+      "samples": 203
+    },
+    {
+      "function": "(garbage collector)",
+      "source": "",
+      "samples": 159
+    }
+  ]
+}

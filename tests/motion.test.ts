@@ -20,7 +20,7 @@ test('taxi accelerates continuously, stays below type limit and slows for a corn
 });
 test('touchdown decelerates without jumps and switching routes preserves position',()=>{
  const g=createGame(2,'medium'),p=g.aircraft[0];g.aircraft=[p];g.nextWave=g.nextEmergency=g.nextWeather=g.nextWind=999;command(g,p.id,'land',0,0,'Tower');let touchdown=false,last=p.groundSpeed!;
- for(let i=0;i<400&&p.remaining>0;i++){const before=p.groundSpeed!;tickGame(g,1,()=>{});if(p.status==='landing'&&!p.onFinal){touchdown=true;assert.ok(p.groundSpeed!<=before+.01);assert.ok(before-p.groundSpeed!<=flightProfiles.narrowbody.brake+1);last=p.groundSpeed!;}}
+ for(let i=0;i<400&&p.remaining>0;i++){const before=p.groundSpeed!;tickGame(g,1,()=>{});if(p.status==='landing'&&!p.onFinal){touchdown=true;if(p.landingPhase==='exit')assert.ok(p.groundSpeed!-before<=4.01);else assert.ok(p.groundSpeed!<=before+.01);assert.ok(before-p.groundSpeed!<=flightProfiles.narrowbody.brake+1);last=p.groundSpeed!;}}
  assert.ok(touchdown);assert.ok(last<20);const before=[...p.position!];command(g,p.id,'taxi',0,p.revision,'Tower');assert.deepEqual(p.position,before);
 });
 test('entering hold and a wind reroute do not teleport an aircraft',()=>{

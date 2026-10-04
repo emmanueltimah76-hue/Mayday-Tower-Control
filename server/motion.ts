@@ -1,5 +1,5 @@
 import {airspace,boundaryPoint} from '../src/routes.js';
-import {NM_PER_MAP_UNIT,FEET_PER_NM,SECONDS_PER_HOUR} from '../src/mapConstants.js';
+import {NM_PER_MAP_UNIT,FEET_PER_NM,SECONDS_PER_HOUR,MOTION_STEP_SECONDS} from '../src/mapConstants.js';
 import type {Aircraft,AircraftType} from '../src/protocol.js';
 import type {Point} from '../src/airports.js';
 export const flightProfiles:Record<AircraftType,{approach:number;taxi:number;turnTaxi:number;turnRate:number;brake:number;acceleration:number}>={light:{approach:70,taxi:18,turnTaxi:8,turnRate:25,brake:9,acceleration:5},regional:{approach:130,taxi:18,turnTaxi:8,turnRate:20,brake:10,acceleration:6},narrowbody:{approach:140,taxi:18,turnTaxi:7,turnRate:18,brake:10,acceleration:6},heavy:{approach:150,taxi:16,turnTaxi:6,turnRate:12,brake:8,acceleration:5}};
@@ -34,17 +34,22 @@ export function setRoute(p:Aircraft,points:Point[],scale=NM_PER_MAP_UNIT){
  }else p.routeTurns=undefined;p.routeIndex=1;p.routeProgress=0;
  const profile=flightProfiles[p.aircraftType??'narrowbody'];p.remaining=Math.max(1,Math.ceil(routeLength(p.route)*scale*SECONDS_PER_HOUR/(p.status.startsWith('taxi')?profile.taxi:profile.approach)));p.routeDuration=p.remaining;
 }
-export function remainingDistance(p:Aircraft){if(!p.route||!p.position)return 0;const index=p.routeIndex??1;return (p.route[index]?distance(p.position,p.route[index]):0)+p.route.slice(index+1).reduce((n,b,i)=>n+distance(p.route![index+i],b),0);}
+const lengths=new WeakMap<Point[],{length:number;suffix:number[]}>();
+export function remainingDistance(p:Aircraft){if(!p.route||!p.position)return 0;const index=p.routeIndex??1;let cached=lengths.get(p.route);if(!cached||cached.length!==p.route.length){const suffix=Array(p.route.length).fill(0);for(let i=p.route.length-2;i>=0;i--)suffix[i]=suffix[i+1]+distance(p.route[i],p.route[i+1]);cached={length:p.route.length,suffix};lengths.set(p.route,cached);}return p.route[index]?distance(p.position,p.route[index])+(cached.suffix[index]??0):0;}
 export function advanceMotion(p:Aircraft,dt:number,scale=NM_PER_MAP_UNIT):boolean{
+ if(!Number.isFinite(dt)||dt<=0)return false;let left=Math.min(dt,1),arrived=false;
+ while(left>1e-8&&!arrived){const step=Math.min(left,MOTION_STEP_SECONDS);arrived=advanceStep(p,step,scale);left-=step;}return arrived;
+}
+function advanceStep(p:Aircraft,dt:number,scale:number):boolean{
  const profile=flightProfiles[p.aircraftType??'narrowbody'];const oldSpeed=p.groundSpeed??0;const before=p.position;if(!before||!p.route||p.route.length<2)return true;
  let index=p.routeIndex??1;while(index<p.route.length&&distance(before,p.route[index])<.001)index++;p.routeIndex=index;
  const left=remainingDistance(p);const ground=(p.status==='takeoff'&&(index<(p.takeoffRollIndex??1)||((p.altitude??0)<1&&oldSpeed<profile.approach*.85)))||p.status.startsWith('taxi')||p.status==='queued'||p.status==='gate'||p.status==='pushback'||(p.status==='landing'&&!p.onFinal);
- let target=p.status==='takeoff'&&index<(p.takeoffRollIndex??1)?profile.taxi:p.status.startsWith('taxi')?profile.taxi:p.status==='landing'&&!p.onFinal?0:p.status==='takeoff'?profile.approach+25:profile.approach;
+ let target=p.status==='takeoff'&&index<(p.takeoffRollIndex??1)?profile.taxi:p.status.startsWith('taxi')?profile.taxi:p.status==='landing'&&!p.onFinal?(p.landingPhase==='exit'?profile.turnTaxi:0):p.status==='takeoff'?profile.approach+25:profile.approach;
  if(!ground&&p.targetSpeed!==undefined)target=p.targetSpeed;
  if(p.status==='pushback')target=3;
  if(ground&&p.groundSpeedLimit!==undefined)target=Math.min(target,p.groundSpeedLimit);
  let rate=ground?3:2;
- if(p.status==='landing'&&!p.onFinal)rate=profile.brake;
+ if(p.status==='landing'&&!p.onFinal)rate=p.landingPhase==='exit'?4:profile.brake;
  if(p.status==='takeoff')rate=index<(p.takeoffRollIndex??1)?3:profile.acceleration;
  const stopping=oldSpeed*oldSpeed/(2*4*SECONDS_PER_HOUR*scale);
  if(p.status.startsWith('taxi')||(p.status==='takeoff'&&index<(p.takeoffRollIndex??1))){
@@ -57,9 +62,21 @@ export function advanceMotion(p:Aircraft,dt:number,scale=NM_PER_MAP_UNIT):boolea
  const travel=(oldSpeed+p.groundSpeed)/2*dt/(SECONDS_PER_HOUR*scale);
  let pos:Point=[...before];
  if(ground){
-  let leftTravel=travel;
-  while(leftTravel>0&&index<p.route.length){const next=p.route[index],d=distance(pos,next);if(d<.001){index++;continue;}const h=Math.atan2(next[0]-pos[0],-(next[1]-pos[1]))*180/Math.PI;
-   const nose=p.status==='pushback'?h+180:h;p.heading=(p.heading??nose)+shortestAngle(p.heading??nose,nose);const moved=Math.min(leftTravel,d);pos=[pos[0]+Math.sin(h*Math.PI/180)*moved,pos[1]-Math.cos(h*Math.PI/180)*moved];leftTravel-=moved;if(moved>=d)index++;}
+  const next=p.route[index];if(next&&travel>0){
+   const bearing=Math.atan2(next[0]-before[0],-(next[1]-before[1]))*180/Math.PI;
+   const reverse=p.status==='pushback'?180:0;
+   p.heading=limitedHeading(p.heading??bearing+reverse,bearing+reverse,profile.turnRate,dt);
+   const h=(p.heading-reverse)*Math.PI/180;
+   // Integrate along the stored nose (pushback is the explicit reverse exception).
+   const dx=next[0]-before[0],dy=next[1]-before[1],forward=dx*Math.sin(h)-dy*Math.cos(h),cross=Math.abs(dx*Math.cos(h)+dy*Math.sin(h));
+   const moved=index===p.route.length-1&&forward>=0&&cross<.002?Math.min(travel,forward):travel;
+   pos=[before[0]+Math.sin(h)*moved,before[1]-Math.cos(h)*moved];
+   // Cross the waypoint plane without snapping to a point or pivoting in place.
+   const capture=Math.max(.025,travel*.4);
+   while(index<p.route.length){const q=p.route[index],a=p.route[index-1],vx=q[0]-a[0],vy=q[1]-a[1],len=Math.hypot(vx,vy);if(len<.001){index++;continue;}const passed=(pos[0]-q[0])*vx+(pos[1]-q[1])*vy>=-1e-8,lateral=Math.abs((pos[0]-q[0])*vy-(pos[1]-q[1])*vx)/len;
+    if(passed&&lateral<capture||distance(pos,q)<.002){index++;}else break;
+   }
+  }
  }else{
   let next=p.route[index];
   if(next){
@@ -84,6 +101,7 @@ export function advanceMotion(p:Aircraft,dt:number,scale=NM_PER_MAP_UNIT):boolea
    else if(index<p.route.length-1&&distance(pos,next)<radius*.4)index++;
   }
  }
+ if(distance(before,pos)>1e-5)p.travelDirection=Math.atan2(pos[0]-before[0],-(pos[1]-before[1]))*180/Math.PI;
  p.position=pos;p.routeIndex=index;
  const remaining=remainingDistance(p);
  let altitudeTarget=p.altitude??0;

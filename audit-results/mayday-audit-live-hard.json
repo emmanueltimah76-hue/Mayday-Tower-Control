@@ -1,0 +1,335 @@
+{
+  "base": "/private/tmp/mayday-live-audit",
+  "noHold": false,
+  "seed": 2703,
+  "difficulty": "hard",
+  "seconds": 420,
+  "players": 6,
+  "maxAircraft": 18,
+  "accepted": 29,
+  "rejected": 2491,
+  "sampleChecks": 5227,
+  "landed": 5,
+  "failures": {
+    "alignment:taxi-out": {
+      "count": 17,
+      "examples": [
+        {
+          "t": 3,
+          "id": "flight-2",
+          "state": "taxi-out",
+          "heading": -22.799999999999994,
+          "travel": -93.75435738888042,
+          "error": 70.95435738888045
+        },
+        {
+          "t": 4,
+          "id": "flight-2",
+          "state": "taxi-out",
+          "heading": -34.8,
+          "travel": -93.75435738889587,
+          "error": 58.95435738889586
+        },
+        {
+          "t": 5,
+          "id": "flight-2",
+          "state": "taxi-out",
+          "heading": -46.800000000000026,
+          "travel": -93.75435738888655,
+          "error": 46.954357388886535
+        },
+        {
+          "t": 6,
+          "id": "flight-2",
+          "state": "taxi-out",
+          "heading": -58.800000000000054,
+          "travel": -93.75435738889104,
+          "error": 34.95435738889097
+        }
+      ]
+    },
+    "alignment:holding": {
+      "count": 1783,
+      "examples": [
+        {
+          "t": 68,
+          "id": "flight-5",
+          "state": "holding",
+          "heading": 88.96419565430404,
+          "travel": 101.69275529496838,
+          "error": 12.728559640664344
+        },
+        {
+          "t": 69,
+          "id": "flight-5",
+          "state": "holding",
+          "heading": 91.964195654304,
+          "travel": 114.17846172207774,
+          "error": 22.21426606777368
+        },
+        {
+          "t": 70,
+          "id": "flight-5",
+          "state": "holding",
+          "heading": 94.96419565430398,
+          "travel": 126.66416814918733,
+          "error": 31.699972494883355
+        },
+        {
+          "t": 71,
+          "id": "flight-5",
+          "state": "holding",
+          "heading": 97.96419565430395,
+          "travel": 139.14987457629684,
+          "error": 41.18567892199292
+        }
+      ]
+    },
+    "orphan": {
+      "count": 37,
+      "examples": [
+        {
+          "t": 127,
+          "id": "flight-9",
+          "state": "holding",
+          "remaining": 97,
+          "speed": 150
+        },
+        {
+          "t": 190,
+          "id": "flight-14",
+          "state": "holding",
+          "remaining": 112,
+          "speed": 150
+        },
+        {
+          "t": 244,
+          "id": "flight-18",
+          "state": "holding",
+          "remaining": 130,
+          "speed": 130
+        },
+        {
+          "t": 277,
+          "id": "flight-21",
+          "state": "holding",
+          "remaining": 104,
+          "speed": 140
+        }
+      ]
+    },
+    "runwayMultipleOwners": {
+      "count": 17,
+      "examples": [
+        {
+          "t": 139,
+          "runway": 1,
+          "aircraft": [
+            {
+              "id": "flight-1",
+              "state": "taxi-in"
+            },
+            {
+              "id": "flight-6",
+              "state": "taxi-in"
+            }
+          ]
+        },
+        {
+          "t": 140,
+          "runway": 1,
+          "aircraft": [
+            {
+              "id": "flight-1",
+              "state": "taxi-in"
+            },
+            {
+              "id": "flight-6",
+              "state": "taxi-in"
+            }
+          ]
+        },
+        {
+          "t": 141,
+          "runway": 1,
+          "aircraft": [
+            {
+              "id": "flight-1",
+              "state": "taxi-in"
+            },
+            {
+              "id": "flight-6",
+              "state": "taxi-in"
+            }
+          ]
+        },
+        {
+          "t": 142,
+          "runway": 1,
+          "aircraft": [
+            {
+              "id": "flight-1",
+              "state": "taxi-in"
+            },
+            {
+              "id": "flight-6",
+              "state": "taxi-in"
+            }
+          ]
+        }
+      ]
+    },
+    "alignment:go-around": {
+      "count": 39,
+      "examples": [
+        {
+          "t": 243,
+          "id": "flight-12",
+          "state": "go-around",
+          "heading": 84.47708020807995,
+          "travel": -97.02291979189928,
+          "error": 178.50000000002075
+        },
+        {
+          "t": 244,
+          "id": "flight-12",
+          "state": "go-around",
+          "heading": 87.47708020807993,
+          "travel": -97.02291979192022,
+          "error": 175.4999999999999
+        },
+        {
+          "t": 245,
+          "id": "flight-12",
+          "state": "go-around",
+          "heading": 90.4770802080799,
+          "travel": -97.02291979192022,
+          "error": 172.4999999999999
+        },
+        {
+          "t": 246,
+          "id": "flight-12",
+          "state": "go-around",
+          "heading": 93.47708020807987,
+          "travel": -97.02291979192022,
+          "error": 169.4999999999999
+        }
+      ]
+    },
+    "alignment:landing": {
+      "count": 2,
+      "examples": [
+        {
+          "t": 307,
+          "id": "flight-21",
+          "state": "landing",
+          "heading": 106.96419565430104,
+          "travel": 82.87642105340936,
+          "error": 24.087774600891635
+        },
+        {
+          "t": 308,
+          "id": "flight-21",
+          "state": "landing",
+          "heading": 103.96419565430107,
+          "travel": 82.87642105341031,
+          "error": 21.087774600890725
+        }
+      ]
+    },
+    "alignment:pushback": {
+      "count": 29,
+      "examples": [
+        {
+          "t": 355,
+          "id": "flight-1",
+          "state": "pushback",
+          "heading": 172.96419565452533,
+          "travel": 180,
+          "error": 172.96419565452533
+        },
+        {
+          "t": 356,
+          "id": "flight-1",
+          "state": "pushback",
+          "heading": 172.96419565452533,
+          "travel": 180,
+          "error": 172.96419565452533
+        },
+        {
+          "t": 357,
+          "id": "flight-1",
+          "state": "pushback",
+          "heading": 172.96419565452533,
+          "travel": 180,
+          "error": 172.96419565452533
+        },
+        {
+          "t": 358,
+          "id": "flight-1",
+          "state": "pushback",
+          "heading": 172.96419565452533,
+          "travel": 180,
+          "error": 172.96419565452533
+        }
+      ]
+    },
+    "alignment:gate": {
+      "count": 1,
+      "examples": [
+        {
+          "t": 384,
+          "id": "flight-1",
+          "state": "gate",
+          "heading": 172.96419565452533,
+          "travel": 180,
+          "error": 172.96419565452533
+        }
+      ]
+    }
+  },
+  "slowestTicks": [
+    {
+      "aircraft": 16,
+      "ms": 2.0057710000000384,
+      "bytes": 25441
+    },
+    {
+      "aircraft": 2,
+      "ms": 1.624524000000008,
+      "bytes": 2414
+    },
+    {
+      "aircraft": 16,
+      "ms": 1.4478689999999688,
+      "bytes": 29012
+    },
+    {
+      "aircraft": 16,
+      "ms": 1.391017999999974,
+      "bytes": 29157
+    }
+  ],
+  "tickMs": {
+    "median": 0.6492939999999976,
+    "p95": 1.1216820000000212,
+    "max": 2.0057710000000384
+  },
+  "snapshotBytes": {
+    "median": 23878,
+    "max": 29734,
+    "sixClientsMax": 178404
+  },
+  "density": {
+    "light": {
+      "ticks": 54,
+      "meanMs": 0.20098853703703623,
+      "meanSnapshotBytes": 3810.203703703704
+    },
+    "heavy": {
+      "ticks": 318,
+      "meanMs": 0.7662910911949696,
+      "meanSnapshotBytes": 25556.078616352203
+    }
+  }
+}

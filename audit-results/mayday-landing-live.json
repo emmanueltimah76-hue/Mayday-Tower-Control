@@ -1,0 +1,13 @@
+{
+  "base": "/private/tmp/mayday-live-audit",
+  "rollout": {
+    "peakTurnDegPerSecond": 17.999999999999545,
+    "maxTravelHeadingError": 4.622939718919952,
+    "headingToleranceAtTouchdown": 7,
+    "groundTurnLimit": 18
+  },
+  "landDuringRollout": {
+    "error": "That command is not available at this stage."
+  },
+  "runwayStillBusyAfterPhysicalExit": true
+}

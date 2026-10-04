@@ -1,5 +1,8 @@
+import {motionViolations} from './invariants.js';
+import {transition,ownsMotionPath} from './stateMachine.js';
+import {runwayBlockers,runwayClearOfAircraft,landingUnavailable} from '../src/runwaySafety.js';
 import {poseCurves} from './groundCurves.js';
-import {onGround,pointSegmentDistance} from '../src/groundGeometry.js';
+import {onGround,groundRadius,pointSegmentDistance} from '../src/groundGeometry.js';
 import {prepareGround,advanceGround,planGroundRoute,routeSafe} from './ground.js';
 import {balance,fuelBurnPerSecond,points} from '../src/balance.js';
 import {patternProfiles,patternGeometry} from '../src/flightPatterns.js';
@@ -37,7 +40,7 @@ export function createGame(players:number,difficulty?:Difficulty):GameState{
  const c=airports[difficulty],tuning=balance[difficulty];const game:GameState={difficulty,direction:0,wind:{heading:difficulty==='expert'?90:c.runways[0].heading,speed:8},nextRadioLoss:110,alerts:[],separationLosses:0,incursions:0,nextWind:155,wakeUntil:{},waveRemaining:0,nextWave:25,aircraft:[],score:0,handled:0,missed:0,unsafe:0,secondsLeft:420,elapsed:0,sequence:0,nextSpawn:25,trafficInterval:Math.max(14,tuning.interval-Math.max(0,players-2)),nextWeather:c.weatherEvery,nextEmergency:20,emergenciesHandled:0};spawn(game,'arrival');spawn(game,'departure');return game;
 }
 function intersects(a:Point,b:Point,c:Point,d:Point){const cross=(p:Point,q:Point,r:Point)=>(q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]);return cross(a,b,c)*cross(a,b,d)<0&&cross(c,d,a)*cross(c,d,b)<0;}
-export function runwayBusy(game:GameState,index:number){if(!game.difficulty)return legacy.runwayBusy(game,index);const r=airports[game.difficulty].runways[index];if(!r)return true;return game.aircraft.some(p=>p.groundReserved&&p.groundRunways?.includes(index)||p.runway!==undefined&&['landing','takeoff','taxi-in'].includes(p.status)&&!p.onFinal&&(p.runway===index||intersects(r.start,r.end,airports[game.difficulty!].runways[p.runway].start,airports[game.difficulty!].runways[p.runway].end)));}
+export function runwayBusy(game:GameState,index:number,exceptId?:string){if(!game.difficulty)return legacy.runwayBusy(game,index);return !airports[game.difficulty].runways[index]||runwayBlockers(game,index).some(p=>p.id!==exceptId);}
 export function wakeRemaining(game:GameState,index:number,p?:Aircraft){const left=(game.wakeUntil?.[index]??0)-game.elapsed;return Math.max(0,left-(p?.aircraftType==='heavy'?8:0));}
 export function command(game:GameState,id:unknown,action:Command,runway:unknown,revision:unknown,controller:string):{error?:string;event?:string;changed?:boolean}{
  if(!game.difficulty){if(action==='pushback')return {error:'Pushback is only available at real airports.'};return legacy.command(game,id,action,runway,revision,controller);}
@@ -48,7 +51,7 @@ export function command(game:GameState,id:unknown,action:Command,runway:unknown,
   const h=(p.heading??0)*Math.PI/180,distance=3*duration/(SECONDS_PER_HOUR*NM_PER_MAP_UNIT);
   const end:Point=[p.position![0]-Math.sin(h)*distance,p.position![1]+Math.cos(h)*distance];
   const planned=planGroundRoute(game,{...p,status:'pushback',kind:'departure'},[p.position!,end]);if(!planned)return {error:'Pushback blocked by ground traffic or a runway. Wait and retry.'};
-  p.status='pushback';p.kind='departure';p.fuel=Math.max(240,Math.round(performance[p.aircraftType??'narrowbody'].fuel*airports[game.difficulty].fuelFactor));p.emergency=false;p.squawk=p.normalSquawk;p.runway=undefined;p.controller=controller;p.revision++;p.groundSpeed=0;
+  transition(p,'pushback');p.kind='departure';p.fuel=Math.max(240,Math.round(performance[p.aircraftType??'narrowbody'].fuel*airports[game.difficulty].fuelFactor));p.emergency=false;p.squawk=p.normalSquawk;p.runway=undefined;p.controller=controller;p.revision++;p.groundSpeed=0;
   route(p,planned,duration);p.remaining=Math.ceil(routeLength(p.route!)*NM_PER_MAP_UNIT*SECONDS_PER_HOUR/3)+1;p.groundRequestedAt=game.elapsed;p.groundReserved=false;
   return {changed:true,event:`${p.callsign}, pushback approved from ${p.gate}.`};
  }
@@ -59,27 +62,27 @@ export function command(game:GameState,id:unknown,action:Command,runway:unknown,
  if(assign||action==='takeoff'){
   const index=r as number;
   if(game.weather?.runway===index)return {error:'Runway closed by crosswinds. Use another runway.'};
-  if(runwayBusy(game,index)){return {error:'Runway or crossing runway occupied. Unsafe clearance rejected; no penalty because entry was prevented.'};}
+  if(runwayBusy(game,index,action==='takeoff'?p.id:undefined)){return {error:'Runway or crossing runway occupied. Unsafe clearance rejected; no penalty because entry was prevented.'};}
   if((action==='land'||action==='takeoff')&&wakeRemaining(game,index,p)>0)return {error:`Wake turbulence: wait ${wakeRemaining(game,index,p)}s before clearing ${p.callsign}.`};
  }
  const arrivalStand=action==='taxi'&&p.kind==='arrival'?openStand(game):undefined;
  if(action==='taxi'&&p.kind==='arrival'&&!arrivalStand)return {error:'Ramp full. Keep position until a stand opens; push back a ready aircraft.'};
  let taxiRoute:Point[]|undefined;
  if(action==='taxi'){const index=r as number,gate=arrivalStand?.position??gatePoint(p,game),ahead=game.aircraft.filter(q=>q!==p&&q.runway===index&&['taxi-out','queued'].includes(q.status)).length;taxiRoute=planGroundRoute(game,{...p,runway:index},groundRoute(game,index,gate,p.position!,p.kind==='arrival',ahead));if(!taxiRoute)return {error:'No safe taxi route is available around traffic or terminal blocks. Wait for traffic to clear and retry.'};}
- if(action==='land'&&p.clearedToLand)return {error:'Landing clearance is already active. Continue the current pattern.'};
+ if(action==='land'){const error=landingUnavailable(game,p,r as number);if(error)return {error};}
  if(assign)p.runway=r as number;
  const perf=performance[p.aircraftType??'narrowbody'];const scale=airports[game.difficulty].nmPerUnit;const name=runwayName(game,p.runway??0);
  if(action==='hold'){beginGoAround(game,p,true);}
  if(action==='land'){if(!p.patternLegs||p.approachRunway!==p.runway){p.approachRunway=p.runway;beginGoAround(game,p,!!p.holdRequested);}p.clearedToLand=true;}
  if(action==='taxi'){
-  if(arrivalStand){p.gate=arrivalStand.id;p.standId=arrivalStand.id;}p.status=p.kind==='arrival'?'taxi-in':'taxi-out';p.taxiway=taxiName(game.difficulty,p.runway!);p.groundRequestedAt=game.elapsed;p.groundReserved=false;route(p,taxiRoute!,perf.taxi,scale);
+  if(arrivalStand){p.gate=arrivalStand.id;p.standId=arrivalStand.id;}transition(p,p.kind==='arrival'?'taxi-in':'taxi-out');p.taxiway=taxiName(game.difficulty,p.runway!);p.groundRequestedAt=game.elapsed;p.groundReserved=false;route(p,taxiRoute!,perf.taxi,scale);
  }
  if(action==='takeoff'){
   const first=game.aircraft.find(q=>q.runway===p.runway&&['taxi-out','queued'].includes(q.status));if(first&&first.id!==p.id)return {error:'Another departure is ahead in the hold-short queue. Clear it first.'};
   const [start]=runwayEnds(game,p.runway!),from=p.position??start,outbound=departureRoute(game,p.runway!,p.aircraftType),geometry=patternGeometry(game,p.runway!,p.aircraftType),radius=feetToUnits(minimumTurnFeet[p.aircraftType??'narrowbody']);
   const lineup=poseCurves(from,p.heading??geometry.heading,start,geometry.heading,radius).find(path=>routeSafe(game,{...p,status:'takeoff'},path));
   if(!lineup)return {error:'No safe line-up route is available around ground traffic. Wait for traffic to clear and retry.'};
-  p.takeoffRollIndex=lineup.length;p.outboundFix=`OUT-${p.runway!+1}${game.direction?'B':'A'}`;p.status='takeoff';p.patternLeg='line-up';p.targetAltitude=p.targetSpeed=p.targetHeading=p.finalCourse=undefined;p.groundRequestedAt=game.elapsed;p.groundReserved=false;
+  p.takeoffRollIndex=lineup.length;p.outboundFix=`OUT-${p.runway!+1}${game.direction?'B':'A'}`;transition(p,'takeoff');p.patternLeg='line-up';p.targetAltitude=p.targetSpeed=p.targetHeading=p.finalCourse=undefined;p.groundRequestedAt=game.elapsed;p.groundReserved=false;
   route(p,[...lineup,...outbound.slice(1)],perf.takeoff,scale);
  }
 
@@ -92,19 +95,28 @@ export function tickGame(game:GameState,seconds:number,emit:(s:string)=>void){
  if(!game.difficulty)return legacy.tickGame(game,seconds,emit);
  const config=airports[game.difficulty];
  for(let n=0;n<seconds&&game.secondsLeft>0;n++){
+  const invariantCounts=new Map(game.aircraft.map(p=>[p.id,p.invariantViolations??0]));
   game.elapsed++;game.secondsLeft--;
   for(const p of game.aircraft)if(p.radioLost&&game.elapsed>=(p.radioRestoreAt??0)){p.radioLost=false;p.squawk=p.emergency?'7700':p.normalSquawk;p.revision++;emit(`${p.callsign}, radio contact restored, squawk ${p.squawk}.`);}
   if(game.elapsed>=(game.nextRadioLoss??110)&&game.secondsLeft>50){const p=game.aircraft.find(p=>!p.emergency&&!p.radioLost&&['approach','holding'].includes(p.status));if(p){p.radioLost=true;p.squawk='7600';p.radioRestoreAt=game.elapsed+25;p.revision++;emit(`${p.callsign}, radio contact lost, squawk 7600. Existing clearances remain active.`);}game.nextRadioLoss=game.elapsed+130;}
 
+  for(const p of game.aircraft){if(!ownsMotionPath(p)){
+   p.invariantViolations=(p.invariantViolations??0)+1;p.invariantMessage=`Missing motion path in ${p.status}`;emit(`${p.callsign}, invariant violation: ${p.invariantMessage}; recovering safely.`);
+   if(['approach','holding','go-around'].includes(p.status)||p.onFinal){beginGoAround(game,p,!!p.holdRequested);}
+   else {const target=p.kind==='arrival'?gatePoint(p,game):groundRoute(game,p.runway??p.approachRunway??0,gatePoint(p,game),p.position!,false).at(-1)!;route(p,[p.position!,target],10);p.groundReserved=false;p.groundRequestedAt=game.elapsed;}
+  }}
   prepareGround(game,emit);
   for(const p of [...game.aircraft]){
-   if(p.status==='turnaround'){p.serviceLeft=Math.max(0,(p.serviceLeft??1)-1);if(p.serviceLeft===0){p.serviceStep=(p.serviceStep??0)+1;p.revision++;if(p.serviceStep>=serviceSteps.length){p.status='gate';p.needsPushback=true;emit(`${p.callsign}, turnaround complete at ${p.gate}, ready for pushback.`);}else{p.serviceLeft=serviceSeconds(p.aircraftType);emit(`${p.callsign}, ${serviceSteps[p.serviceStep].toLowerCase()} at ${p.gate}.`);}}continue;}
+   if(p.status==='turnaround'){p.serviceLeft=Math.max(0,(p.serviceLeft??1)-1);if(p.serviceLeft===0){p.serviceStep=(p.serviceStep??0)+1;p.revision++;if(p.serviceStep>=serviceSteps.length){transition(p,'gate');p.needsPushback=true;emit(`${p.callsign}, turnaround complete at ${p.gate}, ready for pushback.`);}else{p.serviceLeft=serviceSeconds(p.aircraftType);emit(`${p.callsign}, ${serviceSteps[p.serviceStep].toLowerCase()} at ${p.gate}.`);}}continue;}
 
 
    if((['approach','holding','go-around','gate','queued'].includes(p.status)&&!p.needsPushback)||p.onFinal){p.fuel-=fuelBurnPerSecond;if(p.fuel<=0){game.aircraft=game.aircraft.filter(a=>a!==p);game.score-=p.emergency?points.emergencyMissed:points.missed;game.missed++;emit(`${p.callsign}, ${p.kind==='arrival'?'diverting':'departure cancelled'} (${p.emergency?'−150':'−50'}).`);continue;}}
-   p.motionSamples=[{position:[...p.position!],heading:p.heading??0}];
+   const sample=(at:number)=>({position:[...p.position!] as Point,heading:p.heading??0,speed:p.groundSpeed??0,altitude:p.altitude??0,state:p.status,at});
+   p.motionSamples=[sample(0)];
    let arrived=false;
    for(let step=0;step<10;step++){
+    const before={position:[...p.position!] as Point,heading:p.heading??0,speed:p.groundSpeed??0,airborne:!!p.onFinal||['approach','holding','go-around'].includes(p.status)||(p.status==='takeoff'&&(p.altitude??0)>10)};
+    const validate=()=>{const problems=motionViolations(p,before,MOTION_STEP_SECONDS);if(problems.length){p.invariantViolations=(p.invariantViolations??0)+problems.length;p.invariantMessage=problems.join('; ');emit(`${p.callsign}, invariant violation: ${p.invariantMessage}.`);}};
     if(p.patternLegs&&(['approach','holding','go-around'].includes(p.status)||p.onFinal)){
      const previous=p.patternLeg;
      const index=p.runway??p.approachRunway??0;
@@ -118,31 +130,41 @@ export function tickGame(game:GameState,seconds:number,emit:(s:string)=>void){
      if(previous!==p.patternLeg){p.revision++;if(p.patternLeg==='rejoin')emit(`${p.callsign}, rejoining downwind at ${Math.round(p.altitude??0)} feet AGL.`);}
      if(arrived&&p.patternLeg==='final'){
       if(!p.clearedToLand||!stabilized(game,p)){goAround(game,p,emit,'Approach not stabilized.');arrived=false;}
-      else{p.onFinal=true;p.status='landing';p.runway=p.runway??p.approachRunway;}
+      else{p.onFinal=true;transition(p,'landing');p.runway=p.runway??p.approachRunway;}
      }
-     if(arrived)break;
-    }else if(p.route&&p.remaining>0){arrived=advanceGround(game,p,.1,emit);if(arrived)break;}
+     if(arrived){validate();p.motionSamples.push(sample((step+1)*MOTION_STEP_SECONDS));break;}
+    }else if(p.route&&p.remaining>0){arrived=advanceGround(game,p,.1,emit);if(arrived){validate();p.motionSamples.push(sample((step+1)*MOTION_STEP_SECONDS));break;}}
     else if(['gate','queued'].includes(p.status)||(p.status==='landing'&&!p.onFinal&&p.remaining===0)){p.groundSpeed=Math.max(0,(p.groundSpeed??0)-flightProfiles[p.aircraftType??'narrowbody'].brake*.1);}
-    p.motionSamples.push({position:[...p.position!],heading:p.heading??0});
+    validate();p.motionSamples.push(sample((step+1)*MOTION_STEP_SECONDS));
    }
-   if(Math.hypot(p.motionSamples.at(-1)!.position[0]-p.position![0],p.motionSamples.at(-1)!.position[1]-p.position![1])>1e-9)p.motionSamples.push({position:[...p.position!],heading:p.heading??0});
-   while(p.motionSamples.length<11)p.motionSamples.push({position:[...p.position!],heading:p.heading??0});
+   if(Math.hypot(p.motionSamples.at(-1)!.position[0]-p.position![0],p.motionSamples.at(-1)!.position[1]-p.position![1])>1e-9)p.motionSamples.push(sample(Math.min(1,p.motionSamples.length*MOTION_STEP_SECONDS)));
+   while(p.motionSamples.length<11)p.motionSamples.push(sample(Math.min(1,p.motionSamples.length*MOTION_STEP_SECONDS)));
+   if(p.status==='taxi-in'&&p.runway!==undefined&&!p.runwayReleased&&runwayClearOfAircraft(game,p,p.runway)){p.runwayReleased=true;if(p.aircraftType==='heavy')game.wakeUntil![p.runway]=game.elapsed+25;emit(`${p.callsign}, runway ${runwayName(game,p.runway)} fully vacated.`);}
    if(p.status==='taxi-out'&&p.standId){const stand=stands[game.difficulty].find(s=>s.id===p.standId)!;const clearance=350/FEET_PER_NM;if(Math.hypot(p.position![0]-stand.position[0],p.position![1]-stand.position[1])*config.nmPerUnit>clearance)p.standId=undefined;}
+   if(p.status==='takeoff'&&(p.altitude??0)>=50&&!p.runwayReleased){p.runwayReleased=true;if(p.aircraftType==='heavy')game.wakeUntil![p.runway!]=game.elapsed+25;}
    if(p.status==='takeoff'){p.patternLeg=(p.routeIndex??1)<(p.takeoffRollIndex??1)?'line-up':(p.altitude??0)<10?'takeoff-roll':(p.routeIndex??1)<p.route!.length-1?'climb-out':'outbound';}
    if(arrived&&p.status!=='holding'&&p.status!=='approach'){p.revision++;
 
     if(p.onFinal){
      if(runwayBusy(game,p.runway!)||game.weather?.runway===p.runway||wakeRemaining(game,p.runway!,p)>0){goAround(game,p,emit,'Runway or wake spacing unavailable on short final.');continue;}
-     const [start,end]=runwayEnds(game,p.runway!);const speed=p.groundSpeed??0,brake=flightProfiles[p.aircraftType??'narrowbody'].brake;const length=Math.hypot(end[0]-start[0],end[1]-start[1]);const roll=speed*speed/(2*brake*SECONDS_PER_HOUR*config.nmPerUnit);p.status='landing';p.onFinal=false;p.patternPhase=undefined;p.currentTarget=undefined;p.patternLeg=p.patternLegs=undefined;p.targetAltitude=p.targetSpeed=p.targetHeading=p.finalCourse=undefined;route(p,[p.position!,lerp(start,end,Math.min(.9,roll/length))],performance[p.aircraftType??'narrowbody'].landing,config.nmPerUnit);
-    }else if(p.status==='pushback'){p.status='gate';p.needsPushback=false;p.standId=undefined;p.groundReserved=false;p.groundResources=undefined;p.groundSpeed=0;p.route=undefined;emit(`${p.callsign}, pushback complete, request taxi clearance.`);}
-    else if(p.status==='landing')emit(`${p.callsign}, vacate runway ${runwayName(game,p.runway!)} via ${p.taxiway??'A'}.`);
-    else if(p.status==='taxi-out'){p.status='queued';emit(`${p.callsign}, holding short runway ${runwayName(game,p.runway!)}.`);}
-    else if(p.status==='go-around'){p.status='holding';p.route=undefined;p.holdingCenter=undefined;}
+     const [start,end]=runwayEnds(game,p.runway!);const speed=p.groundSpeed??0,brake=flightProfiles[p.aircraftType??'narrowbody'].brake;const length=Math.hypot(end[0]-start[0],end[1]-start[1]);const roll=speed*speed/(2*brake*SECONDS_PER_HOUR*config.nmPerUnit);transition(p,'landing');p.landingPhase='rollout';p.runwayReleased=false;p.onFinal=false;p.patternPhase=undefined;p.currentTarget=undefined;p.patternLeg=p.patternLegs=undefined;p.targetAltitude=p.targetSpeed=p.targetHeading=p.finalCourse=undefined;route(p,[p.position!,lerp(start,end,Math.min(.9,roll/length))],performance[p.aircraftType??'narrowbody'].landing,config.nmPerUnit);
+    }else if(p.status==='pushback'){transition(p,'gate');p.needsPushback=false;p.standId=undefined;p.groundReserved=false;p.groundResources=undefined;p.groundSpeed=0;p.route=undefined;emit(`${p.callsign}, pushback complete, request taxi clearance.`);}
+    else if(p.status==='landing'){
+     if(p.landingPhase==='rollout'){
+      const [start,end]=runwayEnds(game,p.runway!),len=Math.hypot(end[0]-start[0],end[1]-start[1]),u:Point=[(end[0]-start[0])/len,(end[1]-start[1])/len],normal:Point=[-u[1],u[0]],radius=feetToUnits(minimumTurnFeet[p.aircraftType??'narrowbody']),clearance=feetToUnits(100)+groundRadius(p)+feetToUnits(25),heading=Math.atan2(u[0],-u[1])*180/Math.PI;
+      const gate=openStand(game)?.position??gatePoint(p,game),preferred=(gate[0]-p.position![0])*normal[0]+(gate[1]-p.position![1])*normal[1]>=0?1:-1;
+      const choices=[preferred,-preferred].flatMap(side=>{const target:Point=[p.position![0]+u[0]*radius+normal[0]*side*Math.max(radius,clearance),p.position![1]+u[1]*radius+normal[1]*side*Math.max(radius,clearance)];return poseCurves(p.position!,p.heading??heading,target,heading+side*90,radius);}).sort((a,b)=>Math.hypot(a.at(-1)![0]-gate[0],a.at(-1)![1]-gate[1])-Math.hypot(b.at(-1)![0]-gate[0],b.at(-1)![1]-gate[1])||routeLength(a)-routeLength(b));
+      const exit=choices.find(path=>routeSafe(game,p,path));
+      if(exit){p.landingPhase='exit';route(p,exit,10);p.groundReserved=false;p.groundRequestedAt=game.elapsed;emit(`${p.callsign}, exiting runway ${runwayName(game,p.runway!)}; runway remains occupied.`);}
+      else {p.landingPhase='clear';emit(`${p.callsign}, hold on runway; request Taxi when a safe exit is available.`);}
+     }else {p.landingPhase='clear';p.runwayReleased=runwayClearOfAircraft(game,p,p.runway!);if(p.runwayReleased&&p.aircraftType==='heavy')game.wakeUntil![p.runway!]=game.elapsed+25;emit(`${p.callsign}, ${p.runwayReleased?'runway fully vacated':'hold on runway'}, request taxi to parking.`);}
+    }
+    else if(p.status==='taxi-out'){transition(p,'queued');emit(`${p.callsign}, holding short runway ${runwayName(game,p.runway!)}.`);}
+    else if(p.status==='go-around'){transition(p,'holding');p.route=undefined;p.holdingCenter=undefined;}
     else if(p.status==='taxi-in'){
-     if(p.aircraftType==='heavy')game.wakeUntil![p.runway!]=game.elapsed+25;
-     if(!p.arrivalCredited){game.handled++;game.score+=p.emergency?points.emergencyHandled:points.handled;if(p.emergency)game.emergenciesHandled++;p.arrivalCredited=true;}p.status='turnaround';p.groundSpeed=0;p.runway=undefined;p.route=undefined;p.serviceStep=0;p.serviceLeft=serviceSeconds(p.aircraftType);p.needsPushback=true;emit(`${p.callsign}, parked at ${p.gate}, deplane started (+${p.emergency?250:100}).`);
+     if(!p.arrivalCredited){game.handled++;game.score+=p.emergency?points.emergencyHandled:points.handled;if(p.emergency)game.emergenciesHandled++;p.arrivalCredited=true;}transition(p,'turnaround');p.groundSpeed=0;p.runway=undefined;p.route=undefined;p.serviceStep=0;p.serviceLeft=serviceSeconds(p.aircraftType);p.needsPushback=true;emit(`${p.callsign}, parked at ${p.gate}, deplane started (+${p.emergency?250:100}).`);
     }else if(p.status==='takeoff'){
-     if(p.aircraftType==='heavy')game.wakeUntil![p.runway!]=game.elapsed+25;
+     if(p.aircraftType==='heavy'&&!p.runwayReleased)game.wakeUntil![p.runway!]=game.elapsed+25;
      game.aircraft=game.aircraft.filter(a=>a!==p);game.handled++;game.score+=p.emergency?points.emergencyHandled:points.handled;if(p.emergency)game.emergenciesHandled++;emit(`${p.callsign}, ${p.kind==='arrival'?`parked at ${p.gate}`:'departure complete'} (+${p.emergency?250:100}).`);
     }
    }
@@ -156,10 +178,11 @@ export function tickGame(game:GameState,seconds:number,emit:(s:string)=>void){
   if(game.elapsed>=(game.nextWind??155)&&game.secondsLeft>50){
    if(game.aircraft.some(p=>p.clearedToLand||['final','landing','takeoff','taxi-in','taxi-out'].includes(p.status))){game.nextWind=game.elapsed+5;}
    else{game.direction=game.direction===0?1:0;game.wind={heading:((game.difficulty==='expert'?90:config.runways[0].heading)+(game.direction?180:0))%360,speed:12};game.nextWind=game.elapsed+150;
-    for(const p of game.aircraft){if(p.status==='queued'){const [start]=runwayEnds(game,p.runway!);const requested=groundRoute(game,p.runway!,gatePoint(p,game),p.position!,false);const planned=planGroundRoute(game,p,requested);route(p,planned??requested,performance[p.aircraftType??'narrowbody'].taxi,config.nmPerUnit);p.groundReserved=false;p.groundRequestedAt=game.elapsed;p.status='taxi-out';p.revision++;}if(['approach','holding','go-around'].includes(p.status)){p.clearedToLand=false;beginGoAround(game,p,!!p.holdRequested);p.revision++;}}
+    for(const p of game.aircraft){if(p.status==='queued'){const [start]=runwayEnds(game,p.runway!);const requested=groundRoute(game,p.runway!,gatePoint(p,game),p.position!,false);const planned=planGroundRoute(game,p,requested);route(p,planned??requested,performance[p.aircraftType??'narrowbody'].taxi,config.nmPerUnit);p.groundReserved=false;p.groundRequestedAt=game.elapsed;transition(p,'taxi-out');p.revision++;}if(['approach','holding','go-around'].includes(p.status)){p.clearedToLand=false;beginGoAround(game,p,!!p.holdRequested);p.revision++;}}
     emit(`Tower: wind shift, ${Math.round(game.wind.heading)} degrees at ${game.wind.speed} knots. Active runways now ${config.runways.map((_,i)=>runwayName(game,i)).join(', ')}. Departures retaxi to the new hold-short points.`);
    }
   }
+  game.invariantViolations=(game.invariantViolations??0)+game.aircraft.reduce((total,p)=>total+Math.max(0,(p.invariantViolations??0)-(invariantCounts.get(p.id)??0)),0);
   game.groundReservations=game.groundReservations?.filter(r=>game.aircraft.some(p=>p.id===r.aircraftId&&p.groundReserved));
  }
 }

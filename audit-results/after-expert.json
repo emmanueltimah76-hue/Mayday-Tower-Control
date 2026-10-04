@@ -1,0 +1,194 @@
+{
+  "base": "/Users/flightdeck.em/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/mayday",
+  "invariantCounter": 0,
+  "overload": false,
+  "noHold": false,
+  "seed": 2703,
+  "difficulty": "expert",
+  "seconds": 420,
+  "players": 6,
+  "maxAircraft": 14,
+  "accepted": 107,
+  "rejected": 2413,
+  "sampleChecks": 43910,
+  "landed": 0,
+  "failures": {},
+  "largestSnapshot": {
+    "bytes": 56917,
+    "elapsed": 323,
+    "fields": {
+      "difficulty": 8,
+      "direction": 1,
+      "wind": 24,
+      "nextRadioLoss": 3,
+      "alerts": 2,
+      "separationLosses": 1,
+      "incursions": 1,
+      "nextWind": 3,
+      "wakeUntil": 2,
+      "waveRemaining": 1,
+      "nextWave": 3,
+      "aircraft": 104587,
+      "score": 1,
+      "handled": 1,
+      "missed": 1,
+      "unsafe": 1,
+      "secondsLeft": 2,
+      "elapsed": 3,
+      "sequence": 2,
+      "nextSpawn": 3,
+      "trafficInterval": 2,
+      "nextWeather": 3,
+      "nextEmergency": 3,
+      "emergenciesHandled": 1,
+      "groundReservations": 656,
+      "alertLastLogged": 2,
+      "invariantViolations": 1,
+      "weather": 25
+    },
+    "aircraft": [
+      {
+        "id": "flight-1",
+        "state": "holding",
+        "routePoints": 5,
+        "routeBytes": 180,
+        "samplesBytes": 1553
+      },
+      {
+        "id": "flight-2",
+        "state": "takeoff",
+        "routePoints": 726,
+        "routeBytes": 28576,
+        "samplesBytes": 1621
+      },
+      {
+        "id": "flight-3",
+        "state": "holding",
+        "routePoints": 5,
+        "routeBytes": 198,
+        "samplesBytes": 1555
+      },
+      {
+        "id": "flight-4",
+        "state": "queued",
+        "routePoints": 140,
+        "routeBytes": 5493,
+        "samplesBytes": 1473
+      },
+      {
+        "id": "flight-5",
+        "state": "holding",
+        "routePoints": 5,
+        "routeBytes": 199,
+        "samplesBytes": 1550
+      },
+      {
+        "id": "flight-6",
+        "state": "approach",
+        "routePoints": 5,
+        "routeBytes": 200,
+        "samplesBytes": 1555
+      },
+      {
+        "id": "flight-7",
+        "state": "queued",
+        "routePoints": 92,
+        "routeBytes": 3607,
+        "samplesBytes": 1473
+      },
+      {
+        "id": "flight-9",
+        "state": "taxi-out",
+        "routePoints": 298,
+        "routeBytes": 11650,
+        "samplesBytes": 1487
+      },
+      {
+        "id": "flight-12",
+        "state": "gate",
+        "routePoints": 0,
+        "routeBytes": 0,
+        "samplesBytes": 1044
+      },
+      {
+        "id": "flight-13",
+        "state": "queued",
+        "routePoints": 207,
+        "routeBytes": 8032,
+        "samplesBytes": 1484
+      },
+      {
+        "id": "flight-15",
+        "state": "gate",
+        "routePoints": 0,
+        "routeBytes": 0,
+        "samplesBytes": 1011
+      },
+      {
+        "id": "flight-16",
+        "state": "gate",
+        "routePoints": 0,
+        "routeBytes": 0,
+        "samplesBytes": 989
+      },
+      {
+        "id": "flight-18",
+        "state": "gate",
+        "routePoints": 0,
+        "routeBytes": 0,
+        "samplesBytes": 1000
+      },
+      {
+        "id": "flight-19",
+        "state": "gate",
+        "routePoints": 0,
+        "routeBytes": 0,
+        "samplesBytes": 1055
+      }
+    ]
+  },
+  "slowestTicks": [
+    {
+      "aircraft": 14,
+      "ms": 335.817685,
+      "bytes": 56760
+    },
+    {
+      "aircraft": 10,
+      "ms": 211.68670999999995,
+      "bytes": 46029
+    },
+    {
+      "aircraft": 14,
+      "ms": 51.81085699999994,
+      "bytes": 56750
+    },
+    {
+      "aircraft": 13,
+      "ms": 20.30624799999987,
+      "bytes": 52009
+    }
+  ],
+  "tickMs": {
+    "median": 4.469102000000021,
+    "p95": 8.09897600000022,
+    "max": 335.817685
+  },
+  "snapshotBytes": {
+    "median": 49155,
+    "max": 56917,
+    "sixClientsMax": 341502
+  },
+  "density": {
+    "light": {
+      "ticks": 52,
+      "meanMs": 3.947408346153845,
+      "meanSnapshotBytes": 16755.173076923078
+    },
+    "heavy": {
+      "ticks": 280,
+      "meanMs": 7.307276367857142,
+      "meanSnapshotBytes": 52626.02857142857
+    }
+  }
+}

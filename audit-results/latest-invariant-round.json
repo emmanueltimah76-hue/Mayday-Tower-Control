@@ -1,0 +1,173 @@
+{
+  "base": "/Users/flightdeck.em/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/mayday",
+  "invariantCounter": 0,
+  "overload": false,
+  "noHold": true,
+  "seed": 2703,
+  "difficulty": "hard",
+  "seconds": 420,
+  "players": 6,
+  "maxAircraft": 11,
+  "accepted": 12,
+  "rejected": 2508,
+  "sampleChecks": 36010,
+  "landed": 2,
+  "failures": {},
+  "largestSnapshot": {
+    "bytes": 54509,
+    "elapsed": 281,
+    "fields": {
+      "difficulty": 6,
+      "direction": 1,
+      "wind": 24,
+      "nextRadioLoss": 3,
+      "alerts": 2,
+      "separationLosses": 1,
+      "incursions": 1,
+      "nextWind": 3,
+      "wakeUntil": 2,
+      "waveRemaining": 1,
+      "nextWave": 3,
+      "aircraft": 200981,
+      "score": 1,
+      "handled": 1,
+      "missed": 1,
+      "unsafe": 1,
+      "secondsLeft": 3,
+      "elapsed": 3,
+      "sequence": 2,
+      "nextSpawn": 3,
+      "trafficInterval": 2,
+      "nextWeather": 3,
+      "nextEmergency": 3,
+      "emergenciesHandled": 1,
+      "groundReservations": 779,
+      "alertLastLogged": 2,
+      "invariantViolations": 1,
+      "weather": 25
+    },
+    "aircraft": [
+      {
+        "id": "flight-1",
+        "state": "go-around",
+        "routePoints": 5,
+        "routeBytes": 199,
+        "samplesBytes": 1723
+      },
+      {
+        "id": "flight-2",
+        "state": "takeoff",
+        "routePoints": 630,
+        "routeBytes": 24577,
+        "samplesBytes": 1484
+      },
+      {
+        "id": "flight-3",
+        "state": "go-around",
+        "routePoints": 5,
+        "routeBytes": 201,
+        "samplesBytes": 1695
+      },
+      {
+        "id": "flight-4",
+        "state": "taxi-out",
+        "routePoints": 593,
+        "routeBytes": 23137,
+        "samplesBytes": 1077
+      },
+      {
+        "id": "flight-5",
+        "state": "landing",
+        "routePoints": 183,
+        "routeBytes": 7265,
+        "samplesBytes": 1488
+      },
+      {
+        "id": "flight-6",
+        "state": "landing",
+        "routePoints": 183,
+        "routeBytes": 7067,
+        "samplesBytes": 1595
+      },
+      {
+        "id": "flight-7",
+        "state": "taxi-out",
+        "routePoints": 451,
+        "routeBytes": 17577,
+        "samplesBytes": 1496
+      },
+      {
+        "id": "flight-9",
+        "state": "taxi-out",
+        "routePoints": 589,
+        "routeBytes": 22978,
+        "samplesBytes": 1033
+      },
+      {
+        "id": "flight-12",
+        "state": "taxi-out",
+        "routePoints": 449,
+        "routeBytes": 17629,
+        "samplesBytes": 1077
+      },
+      {
+        "id": "flight-13",
+        "state": "taxi-out",
+        "routePoints": 864,
+        "routeBytes": 33716,
+        "samplesBytes": 1198
+      },
+      {
+        "id": "flight-18",
+        "state": "gate",
+        "routePoints": 0,
+        "routeBytes": 0,
+        "samplesBytes": 1033
+      }
+    ]
+  },
+  "slowestTicks": [
+    {
+      "aircraft": 9,
+      "ms": 248.5570260000004,
+      "bytes": 48287
+    },
+    {
+      "aircraft": 10,
+      "ms": 18.721026000000165,
+      "bytes": 46597
+    },
+    {
+      "aircraft": 10,
+      "ms": 13.71833700000002,
+      "bytes": 46581
+    },
+    {
+      "aircraft": 11,
+      "ms": 12.655268999999862,
+      "bytes": 54469
+    }
+  ],
+  "tickMs": {
+    "median": 2.547715000000153,
+    "p95": 7.6305929999998625,
+    "max": 248.5570260000004
+  },
+  "snapshotBytes": {
+    "median": 46366,
+    "max": 54509,
+    "sixClientsMax": 327054
+  },
+  "density": {
+    "light": {
+      "ticks": 60,
+      "meanMs": 2.319274783333334,
+      "meanSnapshotBytes": 15960.466666666667
+    },
+    "heavy": {
+      "ticks": 210,
+      "meanMs": 4.2888187238095306,
+      "meanSnapshotBytes": 50687.142857142855
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import {transition} from './stateMachine.js';
 import {patternGeometry,patternProfiles} from '../src/flightPatterns.js';
 import {advanceMotion,shortestAngle,remainingDistance} from './motion.js';
 import {NM_PER_MAP_UNIT,knotsToUnitsPerSecond} from '../src/mapConstants.js';
@@ -5,11 +6,11 @@ import type {Aircraft,GameState} from '../src/protocol.js';
 import type {Point} from '../src/airports.js';
 const distance=(a:Point,b:Point)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
 export function beginPattern(game:GameState,p:Aircraft,runway=p.approachRunway??0){
- const g=patternGeometry(game,runway,p.aircraftType);p.approachRunway=runway;p.patternLegs=['inbound','downwind','base','final'];p.patternPhase='inbound';p.patternLeg='inbound';p.patternWidth=g.width;p.patternFinalAlong=undefined;p.onFinal=false;p.status='approach';p.route=[p.position!,g.downwindStart,g.downwindEnd,g.finalStart,g.start];p.routeIndex=1;p.remaining=Math.ceil(p.route.slice(1).reduce((n,q,i)=>n+distance(p.route![i],q),0)/knotsToUnitsPerSecond(patternProfiles[p.aircraftType??'narrowbody'].downwind))+60;
+ const g=patternGeometry(game,runway,p.aircraftType);p.approachRunway=runway;p.patternLegs=['inbound','downwind','base','final'];p.patternPhase='inbound';p.patternLeg='inbound';p.patternWidth=g.width;p.patternFinalAlong=undefined;p.onFinal=false;transition(p,'approach');p.route=[p.position!,g.downwindStart,g.downwindEnd,g.finalStart,g.start];p.routeIndex=1;p.remaining=Math.ceil(p.route.slice(1).reduce((n,q,i)=>n+distance(p.route![i],q),0)/knotsToUnitsPerSecond(patternProfiles[p.aircraftType??'narrowbody'].downwind))+60;
 }
 export function beginGoAround(game:GameState,p:Aircraft,hold=false){
  const g=patternGeometry(game,p.runway??p.approachRunway??0,p.aircraftType);
- p.approachRunway=p.runway??p.approachRunway;p.patternLegs=['go-around','crosswind','rejoin','downwind','base','final'];p.patternPhase='go-around';p.patternLeg='go-around';p.patternWidth=g.width;p.patternFinalAlong=undefined;p.holdRequested=hold;p.holdReachedAltitude=(p.altitude??0)>=1499;p.clearedToLand=false;p.onFinal=false;p.status=hold?'holding':'go-around';p.targetHeading=p.finalCourse=undefined;p.recoveryStartedAt=game.elapsed;
+ p.approachRunway=p.runway??p.approachRunway;p.patternLegs=['go-around','crosswind','rejoin','downwind','base','final'];p.patternPhase='go-around';p.patternLeg='go-around';p.patternWidth=g.width;p.patternFinalAlong=undefined;p.holdRequested=hold;p.holdReachedAltitude=(p.altitude??0)>=1499;p.clearedToLand=false;p.onFinal=false;transition(p,hold?'holding':'go-around');p.targetHeading=p.finalCourse=undefined;p.recoveryStartedAt=game.elapsed;
  p.route=[p.position!,g.downwindStart,g.downwindEnd,g.finalStart,g.start];p.routeIndex=1;
 }
 export function advancePattern(game:GameState,p:Aircraft,dt:number):boolean{
@@ -46,7 +47,7 @@ export function advancePattern(game:GameState,p:Aircraft,dt:number):boolean{
  }else if(phase==='turn-final'||phase==='final'){
   p.currentTarget=g.start;p.targetHeading=g.heading+(phase==='final'?Math.atan2(q.across,g.radius*.6)*180/Math.PI:0);
  }else{p.targetHeading=phase==='go-around'?g.heading:phase==='crosswind'?g.heading-90:g.heading-180;p.currentTarget=phase==='go-around'?point(q.along+g.radius,q.across):phase==='crosswind'?point(q.along,g.width):point(q.along-g.radius,q.across);}
- p.onFinal=p.patternLeg==='final';p.status=recovering||held?(held?'holding':'go-around'):p.onFinal?'landing':'approach';
+ p.onFinal=p.patternLeg==='final';transition(p,recovering||held?(held?'holding':'go-around'):p.onFinal?'landing':'approach');
  // Reuse the same bounded forward integrator. A far steering target prevents a
  // waypoint snap; phase completion is determined by the runway-relative geometry.
  p.routeIndex=phase==='inbound'?1:phase==='downwind'?2:['turn-base','base'].includes(phase)?3:['turn-final','final'].includes(phase)?4:1;

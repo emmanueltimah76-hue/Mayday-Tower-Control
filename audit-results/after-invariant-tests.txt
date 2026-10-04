@@ -1,0 +1,17 @@
+✔ 420-second stress invariant: alignment (1.394821ms)
+✔ 420-second stress invariant: speed (0.134517ms)
+✔ 420-second stress invariant: turnRate (0.115735ms)
+✔ 420-second stress invariant: paths (0.17294ms)
+✔ 420-second stress invariant: runwayOwnership (0.136426ms)
+✔ 420-second stress invariant: legalTransitions (0.126999ms)
+✔ 420-second stress invariant: sixPlayerSync (0.138218ms)
+✔ stabilized touchdown rollout respects the aircraft turn limit (0.289209ms)
+✔ runway ownership releases after physical runway exit (0.209059ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3931.804018

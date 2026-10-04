@@ -1,3 +1,4 @@
+import {snapshotGame} from './snapshot.js';
 import {Analytics} from './analytics.js';
 import {Rankings} from './rankings.js';
 import {airports,type Difficulty} from '../src/airports.js';
@@ -36,7 +37,7 @@ export class Lobby {
   constructor(private graceMs = 30_000, private idleMs = 30 * 60_000, public rankings = new Rankings(), public analytics = new Analytics()) {}
   error(peer: Peer, code: string, message: string) { peer.send({ type: 'error', code, message }); }
   event(room: Room, text: string) { room.events.push({ id: ++room.revision, text }); room.events = room.events.slice(-20); }
-  state(room: Room): RoomState { return { code: room.code, hostId: room.hostId, phase: room.phase, practice: room.practice, difficulty:room.difficulty??'easy', game: room.game, revision: room.revision, players: room.members.map(m => ({ id: m.id, nickname: m.nickname, connected: !!m.peer, selectedAircraft: m.selectedAircraft })), events: room.events }; }
+  state(room: Room): RoomState { return { code: room.code, hostId: room.hostId, phase: room.phase, practice: room.practice, difficulty:room.difficulty??'easy', game: room.game?snapshotGame(room.game):undefined, revision: room.revision, players: room.members.map(m => ({ id: m.id, nickname: m.nickname, connected: !!m.peer, selectedAircraft: m.selectedAircraft })), events: room.events }; }
   broadcast(room: Room) { room.revision++; room.touched = Date.now(); const message: ServerMessage = { type: 'state', room: this.state(room) }; for (const m of room.members) m.peer?.send(message); }
   attach(peer: Peer, room: Room, member: Member) {
     if (member.peer && member.peer !== peer) { this.peers.delete(member.peer); member.peer.close(); }
@@ -132,8 +133,10 @@ export class Lobby {
       if (room.phase !== 'started' || !room.game || room.lastTick === undefined) continue;
       const seconds = Math.floor((now - room.lastTick) / 1000);
       if (seconds < 1) continue;
-      room.lastTick += seconds * 1000;
-      tickGame(room.game, seconds, text => this.event(room, text));
+      room.lastTick = now;
+      tickGame(room.game, Math.min(seconds,2), text => this.event(room, text));
+      // Wall-clock round duration remains seven minutes; delayed motion is never replayed in an unbounded loop.
+      if(seconds>2){const skipped=Math.min(seconds-2,room.game.secondsLeft);room.game.elapsed+=skipped;room.game.secondsLeft-=skipped;this.event(room,'Tower connection delayed. Positions resynchronized.');}
       for (const m of room.members) if (!room.game.aircraft.some(a => a.id === m.selectedAircraft)) m.selectedAircraft = undefined;
       if (room.game.secondsLeft === 0) { this.analytics.event('shiftsCompleted',now); this.completed++; this.rankings.record(room.game,room.roundCrew??room.members.map(m=>m.nickname),!!room.practice);room.phase = 'finished'; this.event(room, 'Shift complete. Your crew can play again.'); }
       this.broadcast(room);

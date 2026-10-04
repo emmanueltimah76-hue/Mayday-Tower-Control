@@ -1,0 +1,13 @@
+{
+  "base": "/Users/flightdeck.em/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/mayday",
+  "rollout": {
+    "peakTurnDegPerSecond": 64.22939718921043,
+    "maxTravelHeadingError": 1.1368683772161603e-12,
+    "headingToleranceAtTouchdown": 7,
+    "groundTurnLimit": 18
+  },
+  "landDuringRollout": {
+    "error": "LAND is unavailable while landing. Landing requires an airborne arrival."
+  },
+  "runwayStillBusyAfterPhysicalExit": true
+}
