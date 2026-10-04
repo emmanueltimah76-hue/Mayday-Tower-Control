@@ -47,7 +47,7 @@ export function planGroundRoute(game:GameState,p:Aircraft,requested:Point[]):Poi
 export function movingGround(p:Aircraft){return onGround(p)&&!!p.route&&p.remaining>0&&(['taxi-in','taxi-out','pushback','takeoff','landing'].includes(p.status));}
 function conflicting(a:Aircraft,b:Aircraft){const gap=groundGap(a,b);return segments(a).some(([x,y])=>segments(b).some(([u,v])=>segmentDistance(x,y,u,v)<gap));}
 function resourceIds(p:Aircraft){
- const cells=new Set<string>(),size=20,padding=groundRadius(p)+feetToUnits(25);
+ const cells=new Set<string>(),size=feetToUnits(300),padding=groundRadius(p)+feetToUnits(25);
  for(const [a,b]of segments(p)){const count=Math.max(1,Math.ceil(distance(a,b)/5));for(let i=0;i<=count;i++){const x=a[0]+(b[0]-a[0])*i/count,y=a[1]+(b[1]-a[1])*i/count;for(let cx=Math.floor((x-padding)/size);cx<=Math.floor((x+padding)/size);cx++)for(let cy=Math.floor((y-padding)/size);cy<=Math.floor((y+padding)/size);cy++)cells.add(`SURFACE:${cx}:${cy}`);}}
  return [...cells];
 }

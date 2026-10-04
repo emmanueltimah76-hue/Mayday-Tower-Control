@@ -9,6 +9,6 @@ export const stands:Record<Difficulty,Stand[]>={
  expert:[{id:'T1-A',terminal:'Terminal 1',position:[280,210]},{id:'T1-B',terminal:'Terminal 1',position:[300,205]},{id:'T2-A',terminal:'Terminal 2',position:[325,220]},{id:'T3-A',terminal:'Terminal 3',position:[350,235]},{id:'T3-B',terminal:'Terminal 3',position:[370,230]},{id:'T5-A',terminal:'Terminal 5',position:[455,205]}]
 };
 export const serviceSteps=['Deplane','Refuel','Service','Board'] as const;
-export function serviceSeconds(type:string|undefined){return type==='heavy'?18:type==='light'?7:12;}
+export function serviceSeconds(type:string|undefined){return 15;}
 
 for(const difficulty of Object.keys(stands) as Difficulty[]) for(const stand of stands[difficulty]) stand.position=normalizeMapPoint(stand.position,difficulty);
