@@ -21,6 +21,6 @@ test('room broadcasts identical command results and rejects guests restarting',(
  class P implements Peer {messages:ServerMessage[]=[];send(m:ServerMessage){this.messages.push(structuredClone(m));}close(){} get state(){return this.messages.filter(m=>m.type==='state').at(-1)!.room;} }
  const l=new Lobby(),a=new P(),b=new P();l.handle(a,{type:'create',nickname:'A'});l.handle(b,{type:'join',nickname:'B',code:a.state.code});l.handle(a,{type:'start'});
  const plane=a.state.game!.aircraft[0];l.handle(b,{type:'command',aircraftId:plane.id,command:'land',runway:0,revision:plane.revision});assert.deepEqual(a.state,b.state);assert.equal(a.state.game!.aircraft[0].clearedToLand,true);
- l.tick(Date.now()+421000);assert.equal(a.state.phase,'finished');assert.deepEqual(a.state,b.state);
+ const run=[...l.rooms.values()][0].game!;run.aircraft[0].emergency=true;run.aircraft[0].fuel=1;l.tick(Date.now()+421000);assert.equal(a.state.phase,'finished');assert.deepEqual(a.state,b.state);
  l.handle(b,{type:'restart'});assert.equal(b.state.phase,'finished');l.handle(a,{type:'restart'});assert.equal(a.state.phase,'lobby');assert.equal(a.state.game,undefined);
 });

@@ -1,3 +1,4 @@
+import {runwayBlockers} from '../src/runwaySafety.js';
 import {poseCurves,smoothCorners} from './groundCurves.js';
 import type {Aircraft,GameState} from '../src/protocol.js';
 import {airports,type Point} from '../src/airports.js';
@@ -7,10 +8,11 @@ import {advanceMotion,curvedRoute,flightProfiles,minimumTurnFeet,remainingDistan
 type Obstacle={a:Point;b:Point;radius:number;name:string};
 const distance=(a:Point,b:Point)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
 function segments(p:Aircraft):[Point,Point][]{if(!p.route||!p.position)return [];const last=p.status==='takeoff'?(p.takeoffRollIndex??1)+1:p.route.length;const raw=[p.position,...p.route.slice(p.routeIndex??1,last)],points:Point[]=[raw[0]];for(let i=1;i<raw.length;i++)if(i===raw.length-1||distance(points.at(-1)!,raw[i])>=3)points.push(raw[i]);return points.slice(1).map((q,i)=>[points[i],q]);}
+function runwaySegments(p:Aircraft):[Point,Point][]{if(!p.route||!p.position)return [];const last=p.status==='takeoff'?(p.takeoffRollIndex??1)+1:p.route.length;const points=[p.position,...p.route.slice(p.routeIndex??1,last)];return points.slice(1).map((q,i)=>[points[i],q]);}
 function obstacles(game:GameState,p:Aircraft):Obstacle[]{return [
  ...game.aircraft.filter(q=>q.id!==p.id&&onGround(q)).map(q=>({a:q.position!,b:q.position!,radius:groundGap(p,q),name:q.callsign})),
  ...terminalBlocks(game.difficulty!).map(t=>({a:t.center,b:t.center,radius:Math.hypot(t.width,t.height)/2+groundRadius(p)+feetToUnits(30),name:t.name})),
- ...airports[game.difficulty!].runways.flatMap((r,i)=>i===p.runway&&(p.status==='takeoff'||p.kind==='arrival'&&pointSegmentDistance(p.position!,r.start,r.end)<feetToUnits(100)+groundRadius(p))?[]:[{a:r.start,b:r.end,radius:feetToUnits(100)+groundRadius(p),name:`Runway ${i+1}`}])
+ ...airports[game.difficulty!].runways.flatMap((r,i)=>p.taxiCrossings?.includes(i)?[]:i===p.runway&&(p.status==='takeoff'||p.kind==='arrival'&&pointSegmentDistance(p.position!,r.start,r.end)<feetToUnits(100)+groundRadius(p))?[]:[{a:r.start,b:r.end,radius:feetToUnits(100)+groundRadius(p),name:`Runway ${i+1}`}])
  ];}
 function clearEdge(a:Point,b:Point,list:Obstacle[],origin:Point){return list.every(o=>pointSegmentDistance(origin,o.a,o.b)<o.radius&&distance(a,origin)<.001?pointSegmentDistance(b,o.a,o.b)>=o.radius:segmentDistance(a,b,o.a,o.b)>=o.radius-.0001);}
 export function routeSafe(game:GameState,p:Aircraft,points:Point[]){const list=obstacles(game,p);if(!points.slice(1).every((q,i)=>clearEdge(points[i],q,list,points[0])))return false;const own=p.runway===undefined?undefined:airports[game.difficulty!].runways[p.runway];if(own&&p.kind==='arrival'){const width=feetToUnits(100)+groundRadius(p);let exited=pointSegmentDistance(points[0],own.start,own.end)>=width;for(let i=1;i<points.length;i++){if(exited&&segmentDistance(points[i-1],points[i],own.start,own.end)<width-.0001)return false;if(pointSegmentDistance(points[i],own.start,own.end)>=width)exited=true;}}return true;}
@@ -25,13 +27,21 @@ export function planGroundRoute(game:GameState,p:Aircraft,requested:Point[]):Poi
   const next=path[1];if(!next)return path;
   const initialHeading=Math.atan2(next[0]-origin[0],-(next[1]-origin[1]))*180/Math.PI;
   if(Math.abs(shortestAngle(travelHeading,initialHeading))<1&&smoothCorners(path))return path;
-  const targets=path.map((q,i)=>({q,i})).filter(({q,i})=>i>0&&distance(origin,q)>=radius*3);const chosen=targets.filter((_,i)=>i===0||i===Math.floor(targets.length/2)||i===targets.length-1);
+  const targets=path.map((q,i)=>({q,i})).filter(({q,i})=>i>0&&distance(origin,q)>=radius*3);const chosen=targets.filter((_,i)=>i===targets.length-1||i%Math.max(1,Math.ceil(targets.length/16))===0);
   let best:Point[]|undefined;
   for(const {q,i}of chosen){const after=path[i+1],before=path[i-1],endHeading=after?Math.atan2(after[0]-q[0],-(after[1]-q[1]))*180/Math.PI:Math.atan2(q[0]-before[0],-(q[1]-before[1]))*180/Math.PI;
    for(const curve of poseCurves(origin,travelHeading,q,endHeading,radius)){const joined=[...curve,...path.slice(i+1)];if(smoothCorners(joined)&&routeSafe(game,p,joined)&&(!best||routeLength(joined)<routeLength(best)))best=joined;}}
   return best;
  };
  const initial=finish(requested);if(initial)return initial;
+ // A gate/hold point has no mandated final heading. Search approach headings
+ // before rejecting it merely because the shortest polyline cannot be curved.
+ const travelHeading=(p.heading??0)+(p.status==='pushback'?180:0);
+ if(p.status!=='pushback'&&distance(origin,end)>.001){
+  const direct=Array.from({length:8},(_,i)=>poseCurves(origin,travelHeading,end,i*45,radius)).flat().sort((a,b)=>routeLength(a)-routeLength(b));
+  for(const path of direct)if(smoothCorners(path)&&routeSafe(game,p,path))return path;
+ }
+
 
  // Visibility graph over the schematic centerline and marked bypass connectors.
  // Reserve the complete traversal atomically before leaving a safe holding point.
@@ -88,9 +98,14 @@ export function prepareGround(game:GameState,emit:(s:string)=>void){
    if(!routeSafe(game,p,[p.position!,...p.route!.slice(p.routeIndex??1)])){p.groundReserved=false;wait(p,'Waiting for a safe connector around traffic, buildings or runways.',game,emit);continue;}
   }
   // Any incidental runway crossing is protected by the same lease as the taxi path.
-  const crossing=airports[game.difficulty!].runways.findIndex((r,i)=>i!==p.runway&&segments(p).some(([a,b])=>segmentDistance(a,b,r.start,r.end)<feetToUnits(100)+groundRadius(p)));
-  p.groundRunways=airports[game.difficulty!].runways.flatMap((r,i)=>segments(p).some(([a,b])=>segmentDistance(a,b,r.start,r.end)<feetToUnits(100)+groundRadius(p))?[i]:[]);
-  if(crossing>=0&&!['takeoff','landing'].includes(p.status)){p.groundReserved=false;wait(p,'Taxi route crosses an unassigned runway; awaiting a safe route.',game,emit);continue;}
+  const crossing=airports[game.difficulty!].runways.findIndex((r,i)=>i!==p.runway&&runwaySegments(p).some(([a,b])=>segmentDistance(a,b,r.start,r.end)<feetToUnits(100)+groundRadius(p)));
+  p.groundRunways=airports[game.difficulty!].runways.flatMap((r,i)=>runwaySegments(p).some(([a,b])=>segmentDistance(a,b,r.start,r.end)<feetToUnits(100)+groundRadius(p))?[i]:[]);
+  if(crossing>=0&&!['takeoff','landing'].includes(p.status)){
+   const crossings=p.groundRunways.filter(i=>i!==p.runway);
+   const undeclared=crossings.some(i=>!p.taxiCrossings?.includes(i));
+   const blocked=crossings.find(i=>runwayBlockers(game,i).some(q=>q.id!==p.id&&(owners.includes(q)||!moving.includes(q)||q.status==='landing'||q.status==='takeoff'))||game.aircraft.some(q=>q!==p&&q.onFinal&&(q.runway??q.approachRunway)===i));
+   if(undeclared||blocked!==undefined){p.groundReserved=false;p.groundResources=undefined;wait(p,undeclared?'Taxi route crosses an unassigned runway; awaiting a safe route.':`Runway crossing ${blocked!+1} waiting for cleared traffic to vacate.`,game,emit);continue;}
+  }
   p.groundReserved=true;p.groundResources=resourceIds(p);for(const id of p.groundResources)claimed.set(id,p);if(p.groundHold){emit(`${p.callsign}, taxi traffic clear, continue.`);p.revision++;p.groundHold=undefined;}owners.push(p);
  }
  game.groundReservations=owners.map(p=>{const intersections=moving.filter(q=>q!==p&&conflicting(p,q)).map(q=>`JUNCTION:${[p.id,q.id].sort().join(':')}`);p.groundResources=[...resourceIds(p),...intersections];return {aircraftId:p.id,resources:p.groundResources,intersections};});

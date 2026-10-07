@@ -94,7 +94,7 @@ export class Lobby {
       if (room.phase !== 'lobby') return this.error(peer, 'STARTED', 'The session has already started.');
       if (msg.type === 'practice' && room.members.length !== 1) return this.error(peer, 'PRACTICE_ONLY', 'Solo practice is for one player. Start a crew session instead.');
       if (msg.type === 'start' && room.members.filter(m => m.peer).length < 2) return this.error(peer, 'NEED_PLAYERS', 'At least two connected players are needed.');
-      room.roundCrew=room.members.filter(m=>m.peer).map(m=>m.nickname);this.analytics.event('shiftsStarted'); if(msg.type === 'practice') this.analytics.event('soloShifts'); this.rounds++; if (msg.type === 'practice') this.practiceRounds++; room.practice = msg.type === 'practice'; room.game = createGame(room.members.filter(m => m.peer).length,room.difficulty??'easy'); room.lastTick = Date.now(); room.phase = 'started'; this.event(room, room.practice ? 'Solo practice started. You control every flight.' : 'The host started the session.'); this.broadcast(room); return;
+      room.roundCrew=room.members.filter(m=>m.peer).map(m=>m.nickname);this.analytics.event('shiftsStarted'); if(msg.type === 'practice') this.analytics.event('soloShifts'); this.rounds++; if (msg.type === 'practice') this.practiceRounds++; room.practice = msg.type === 'practice'; room.game = createGame(room.members.filter(m => m.peer).length,room.difficulty??'easy',true); room.lastTick = Date.now(); room.phase = 'started'; this.event(room, room.practice ? 'Solo practice started. You control every flight.' : 'The host started the session.'); this.broadcast(room); return;
     }
     if (msg.type === 'select') {
       const { room, member } = session;
@@ -135,10 +135,10 @@ export class Lobby {
       if (seconds < 1) continue;
       room.lastTick = now;
       tickGame(room.game, Math.min(seconds,2), text => this.event(room, text));
-      // Wall-clock round duration remains seven minutes; delayed motion is never replayed in an unbounded loop.
-      if(seconds>2){const skipped=Math.min(seconds-2,room.game.secondsLeft);room.game.elapsed+=skipped;room.game.secondsLeft-=skipped;this.event(room,'Tower connection delayed. Positions resynchronized.');}
+      // Endless runs have no wall-clock deadline; catch-up physics stays bounded.
+      if(seconds>2&&!room.game.endless){const skipped=Math.min(seconds-2,room.game.secondsLeft);room.game.elapsed+=skipped;room.game.secondsLeft-=skipped;this.event(room,'Tower connection delayed. Positions resynchronized.');}
       for (const m of room.members) if (!room.game.aircraft.some(a => a.id === m.selectedAircraft)) m.selectedAircraft = undefined;
-      if (room.game.secondsLeft === 0) { this.analytics.event('shiftsCompleted',now); this.completed++; this.rankings.record(room.game,room.roundCrew??room.members.map(m=>m.nickname),!!room.practice);room.phase = 'finished'; this.event(room, 'Shift complete. Your crew can play again.'); }
+      if (room.game.secondsLeft === 0) { this.analytics.event('shiftsCompleted',now); this.completed++; this.rankings.record(room.game,room.roundCrew??room.members.map(m=>m.nickname),!!room.practice);room.phase = 'finished'; this.event(room, room.game.endReason?`Run ended: ${room.game.endReason} Your crew can play again.`:'Shift complete. Your crew can play again.'); }
       this.broadcast(room);
     }
   }

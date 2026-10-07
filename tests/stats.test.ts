@@ -12,7 +12,7 @@ test('stats count connected time, gameplay, reconnects and completed shifts with
  assert.equal(l.stats().connectedPlayerSeconds,15);
  const token=a.messages.find(m=>m.type==='session')!;assert.equal(token.type,'session');
  const b=new P();l.handle(b,{type:'resume',token:token.token});assert.equal(l.stats().roomJoins,1);assert.equal(l.stats().connectedPlayers,1);
- now+=420000;l.tick();assert.equal(l.stats().shiftsCompleted,1);l.handle(b,{type:'restart'});assert.equal(l.stats().playingRooms,0);
+ const run=[...l.rooms.values()][0].game!;run.aircraft[0].emergency=true;run.aircraft[0].fuel=1;now+=420000;l.tick();assert.equal(l.stats().shiftsCompleted,1);l.handle(b,{type:'restart'});assert.equal(l.stats().playingRooms,0);
  assert.ok(!JSON.stringify(l.stats()).includes('SecretName'));l.handle(b,{type:'leave'});assert.equal(l.stats().activeRooms,0);assert.equal(l.stats().connectedPlayers,0);
  }finally{Date.now=original}
 });

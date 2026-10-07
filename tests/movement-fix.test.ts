@@ -24,6 +24,6 @@ test('server availability disables Land on ground, weather, occupancy and repeat
 test('compact display routes preserve the complete authoritative route and current target',()=>{
  const g=createGame(2,'medium'),p=g.aircraft[1];p.route=Array.from({length:2000},(_,i)=>[i,0]);p.routeIndex=800;const s=snapshotGame(g).aircraft[1];assert.equal(p.route.length,2000);assert.ok(s.route!.length<=128);assert.deepEqual(s.currentTarget,[800,0]);assert.deepEqual(s.route!.at(-1),[1999,0]);
 });
-test('large timer gaps end the round on time without unbounded physics catch-up',()=>{
- const lobby=new Lobby(),peer={send(){},close(){}};lobby.handle(peer,{type:'create',nickname:'T'});lobby.handle(peer,{type:'practice'});const room=[...lobby.rooms.values()][0],p=room.game!.aircraft[0],position=[...p.position!];lobby.tick(room.lastTick!+420000);assert.equal(room.phase,'finished');assert.equal(room.game!.elapsed,420);assert.ok(Math.hypot(p.position![0]-position[0],p.position![1]-position[1])<30);
+test('large timer gaps do not expire endless runs or cause unbounded physics catch-up',()=>{
+ const lobby=new Lobby(),peer={send(){},close(){}};lobby.handle(peer,{type:'create',nickname:'T'});lobby.handle(peer,{type:'practice'});const room=[...lobby.rooms.values()][0],p=room.game!.aircraft[0],position=[...p.position!];lobby.tick(room.lastTick!+420000);assert.equal(room.phase,'started');assert.equal(room.game!.elapsed,2);assert.equal(room.game!.endless,true);assert.ok(Math.hypot(p.position![0]-position[0],p.position![1]-position[1])<30);
 });

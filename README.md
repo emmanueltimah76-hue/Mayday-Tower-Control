@@ -1,6 +1,6 @@
 # MAYDAY: Tower Control — Phase 4
 
-A real-time, server-authoritative lobby for 2–6 players. This phase includes create/join room codes, nicknames, live player lists, host-only start, activity messages, reconnection and host transfer. The playable airport includes two runways, arrivals/departures, hold/land/taxi/takeoff commands, server-controlled movement, seven-minute rounds, team scoring, missed-flight penalties, increasing traffic and a results screen. Crew selections and quick messages synchronize in real time. Crosswinds close a free runway for 25 seconds; emergency arrivals have 35 seconds of fuel and earn +250 when handled safely (−150 if missed).
+A real-time, server-authoritative lobby for 2–6 players. This phase includes create/join room codes, nicknames, live player lists, host-only start, activity messages, reconnection and host transfer. The playable airport includes two runways, arrivals/departures, hold/land/taxi/takeoff commands, server-controlled movement, endless survival runs, team scoring, missed-flight penalties, increasing traffic and a results screen. Crew selections and quick messages synchronize in real time. Crosswinds close a free runway for 25 seconds; emergency arrivals have 35 seconds of fuel and earn +250 when handled safely (−150 if missed).
 
 ## Run
 
@@ -33,7 +33,7 @@ Separate physical-device playtesting and feedback. The game and dashboard are pu
 
 ## Solo practice
 
-Create a room and choose **Start solo practice** to learn the controls without another player. Practice uses the same seven-minute shift and scoring. Return to the lobby after the shift to invite friends. Multiplayer requires 2–6 connected players.
+Create a room and choose **Start solo practice** to learn the controls without another player. Practice uses the same endless run, scoring and failure rules. Return to the lobby after the shift to invite friends. Multiplayer requires 2–6 connected players.
 
 ## Realism upgrade
 
@@ -63,7 +63,7 @@ Arrivals spawn at a defined map boundary along named IN game fixes, descending a
 
 Verified name references: PRC A/B/D https://www.faa.gov/flight_deck/prc ; PHX E/F/C https://www.faa.gov/air_traffic/publications/domesticnotices/dom21022_af.html and https://www.faa.gov/airports/runway_safety/publications/Tips-from-PHX-ATC-Tower-Kneecard.pdf ; LAX E https://www.lawa.org/groups-and-divisions/airport-operations/ops-advisory?id=9167&page=2 ; ORD A https://www.faa.gov/flight_deck/ord . Name verification does not imply current operational routes or construction status. PRC runway 3L/21R is not for air-carrier operations in the cited FAA guidance; this game remains simplified.
 
-/leaderboard shows top 100 completed shifts per difficulty and mode, separated into crew and practice. Server-authoritative scores sort descending, ties favor fewer violations, then more handled flights and earlier completion. Only completed seven-minute rounds enter; nicknames are public and unverified, and there is no login. Rankings default to current server memory and reset on free Render restarts/deploys. Optional RANKINGS_FILE enables atomic file saves and reload; permanent retention requires a persistent disk or database, which the free service does not currently have. The page makes the reset limitation visible.
+/leaderboard shows top 100 completed shifts per difficulty and mode, separated into crew and practice. Server-authoritative scores sort descending, ties favor fewer violations, then more handled flights and earlier completion. Only completed endless survival runs enter; nicknames are public and unverified, and there is no login. Rankings default to current server memory and reset on free Render restarts/deploys. Optional RANKINGS_FILE enables atomic file saves and reload; permanent retention requires a persistent disk or database, which the free service does not currently have. The page makes the reset limitation visible.
 
 All 43 tests pass, including original regressions plus boundary entry/exit, circular-radius and continuous-turn tests, completed-round scoring, board separation, tie-breaking, single recording and optional storage reload. Stage 4 remains pending approval. Physical phone/cellular playtests remain outstanding.
 
@@ -86,3 +86,7 @@ Each process upserts its own cumulative snapshot every 30 seconds; retried write
 
 ### Stage 1 movement review branch
 See `STAGE-1-TEST.md` for confirmed movement causes, fixes, validation, exact desktop/phone testing and remaining Stage 2/3 work. This branch is a local review build; do not deploy it to the submitted live site without user test confirmation. The single map scale lives in `src/mapConstants.ts`.
+
+## Endless survival
+
+Public crew and solo sessions have no shift deadline. The server ends the run after three physically crashed aircraft, three forced go-arounds by one aircraft, or an emergency fuel timer reaching zero. Hold commands and predicted conflict alerts are not failures. The scoreboard shows elapsed time and crash count; the final screen states the reason and lets the host restart. Finite fixtures remain available to deterministic movement tests through createGame without the endless flag.

@@ -1,8 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Analytics,dayKey,type AnalyticsStore,type Snapshot} from '../server/analytics.js';
-test('Arizona midnight splits player time without double counting',()=>{
- const a=new Analytics();const midnight=Date.parse('2026-10-04T07:00:00Z');
+test('Arizona midnight splits player time without double counting',t=>{
+ const midnight=Date.parse('2026-10-04T07:00:00Z');t.mock.method(Date,'now',()=>midnight-1000);const a=new Analytics();
  a.time(midnight-1000,midnight+1000,3,2);a.time(midnight+1000,midnight+1000,3,2);
  const r=a.report(midnight+1000);assert.equal(r.totals.connectedMs,6000);assert.equal(r.totals.gameplayMs,4000);
  assert.equal(r.daily.at(-2)?.connectedMs,3000);assert.equal(r.daily.at(-1)?.connectedMs,3000);

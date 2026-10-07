@@ -17,7 +17,7 @@ const peers=Array.from({length:6},()=>({room:null as any,send(m:any){if(m.type==
 const lobby=new Lobby();lobby.handle(peers[0],{type:'create',nickname:'Audit 1'});const code=peers[0].room.code;
 for(let i=1;i<6;i++)lobby.handle(peers[i],{type:'join',nickname:`Audit ${i+1}`,code});
 lobby.handle(peers[0],{type:'difficulty',difficulty:process.env.AUDIT_DIFFICULTY??'expert'});lobby.handle(peers[0],{type:'start'});
-const room=[...lobby.rooms.values()][0] as any,g=room.game,scale=airports[g.difficulty].nmPerUnit;const seenStates=new Map<string,string>();
+const room=[...lobby.rooms.values()][0] as any,g=room.game,scale=airports[g.difficulty].nmPerUnit;const seenStates=new Map<string,string>();g.endless=false; // Fixed-duration physics fixture; production sessions are endless.
 function stateChanges(label:string){for(const p of g.aircraft){const prior=seenStates.get(p.id);if(prior&&prior!==p.status&&!transitions[prior]?.includes(p.status))fail('illegalTransition',{t:g.elapsed,id:p.id,prior,next:p.status,label});seenStates.set(p.id,p.status);}}
 function send(peer:any,p:any,action:string,stale=false){const prior=p.status,rev=p.revision,oldRejected=rejected;lobby.handle(peer,{type:'command',aircraftId:p.id,command:action,runway:p.runway??p.approachRunway??0,revision:stale?rev-1:rev});if(rejected===oldRejected)accepted++;stateChanges(`command ${action}`);}
 if(process.env.AUDIT_OVERLOAD==='1')while(g.aircraft.length<18)spawn(g,'arrival');
